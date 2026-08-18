@@ -3,7 +3,8 @@
 `app.run_test()` pilot (no real terminal). Self-skips (prints SKIP, exits
 0) when textual isn't importable, so `python3 tests/run_tests.py` (plain
 interpreter) still passes — this test only really runs under
-/home/iam/.selectorai/venv/bin/python3, which has textual installed.
+~/.selectorai/venv/bin/python3 (STATE_DIR, see sai/paths.py), which has
+textual installed.
 
 Safety: action_cycle_lang/action_cycle_theme (exercised below) write the
 user's REAL ~/.selectorai/lang and ~/.selectorai/theme files — there is no
@@ -23,7 +24,7 @@ try:
     import textual  # noqa: F401
 except ImportError:
     print("test_picker_headless: SKIP (textual not importable on this interpreter — "
-          "expected under plain python3; run under /home/iam/.selectorai/venv/bin/python3 "
+          "expected under plain python3; run under ~/.selectorai/venv/bin/python3 "
           "to actually exercise this test)")
     sys.exit(0)
 
@@ -46,7 +47,23 @@ STUB_STATUSES = {
     "grok": {"pct_used": 85, "rows": [("Usage", 85, "in 2h")], "note": None, "kind": "ok"},
 }
 
+# Empty on purpose: none of the scenarios below are about service-status
+# fold-in (that's tests/test_health_service.py's job) — this file only
+# needs classify() to behave exactly as it did before service_state
+# existed, and {}.get(p) -> None gives it precisely that "no signal" case.
+STUB_SERVICE_STATES = {}
+
 THEME_PATH = REPO_ROOT / "themes" / "mother.tcss"
+
+# Fake reattach descriptor — same shape sai.cli._reattach_descriptor()
+# builds from real sai.session tmux calls (see that function's docstring),
+# faked here directly since this file drives _build_app in isolation, the
+# same way STUB_STATUSES fakes provider status() output instead of really
+# calling claude/codex/etc.
+STUB_REATTACH = {
+    "windows": [("claude", "2m ago"), ("codex", "1h ago")],
+    "peek_lines": ["$ claude --permission-mode auto", "Working on the thing...", "165 tokens"],
+}
 
 
 def check(label, cond):
@@ -59,7 +76,7 @@ def check(label, cond):
 async def _test_options_and_navigation():
     from textual.widgets import OptionList, Static
 
-    app = picker._build_app(PROVIDER_LIST, STUB_STATUSES, THEME_PATH)
+    app = picker._build_app(PROVIDER_LIST, STUB_STATUSES, STUB_SERVICE_STATES, THEME_PATH)
     async with app.run_test() as pilot:
         option_list = app.query_one("#picker", OptionList)
         # 4 providers + 1 disabled separator row: codex (quota-exhausted)
@@ -112,8 +129,40 @@ async def _test_options_and_navigation():
         check("enter on an OFFLINE provider still returns its id (codex)", app.chosen == "codex")
 
 
+async def _test_reattach_offer():
+    from textual.widgets import OptionList, Static
+
+    app = picker._build_app(PROVIDER_LIST, STUB_STATUSES, STUB_SERVICE_STATES, THEME_PATH, STUB_REATTACH)
+    async with app.run_test() as pilot:
+        option_list = app.query_one("#picker", OptionList)
+        check(
+            "reattach offer adds one row on top of the usual 5 (4 providers + separator)",
+            option_list.option_count == 6,
+        )
+        first = option_list.get_option_at_index(0)
+        check("reattach row is first and carries the _REATTACH sentinel id", first.id == picker._REATTACH)
+        check(
+            "reattach row's label mentions both window names and the freshest ago string",
+            "claude" in first.prompt and "codex" in first.prompt and "2m ago" in first.prompt,
+        )
+        check(
+            "index 1 is still claude, the top provider (reattach didn't push it past the separator)",
+            option_list.get_option_at_index(1).id == "claude",
+        )
+
+        detail = str(app.query_one("#detail", Static).render())
+        check("detail panel shows the peek lines on mount (reattach highlighted first)", "165 tokens" in detail)
+        check(
+            "detail panel does not show provider stats for the reattach row",
+            "Session (5h)" not in detail,
+        )
+
+        await pilot.press("enter")
+        check("enter on the reattach row returns the _REATTACH sentinel, not a provider id", app.chosen == picker._REATTACH)
+
+
 async def _test_cycle_lang():
-    app = picker._build_app(PROVIDER_LIST, STUB_STATUSES, THEME_PATH)
+    app = picker._build_app(PROVIDER_LIST, STUB_STATUSES, STUB_SERVICE_STATES, THEME_PATH)
     exit_results = []
     orig_exit = app.exit
 
@@ -128,7 +177,7 @@ async def _test_cycle_lang():
 
 
 async def _test_cycle_theme():
-    app = picker._build_app(PROVIDER_LIST, STUB_STATUSES, THEME_PATH)
+    app = picker._build_app(PROVIDER_LIST, STUB_STATUSES, STUB_SERVICE_STATES, THEME_PATH)
     exit_results = []
     orig_exit = app.exit
 
@@ -157,6 +206,20 @@ def main():
 
     try:
         asyncio.run(_test_options_and_navigation())
+
+        # Reattach offer: pure rendering + selection, no key that touches
+        # LANG_FILE/THEME_FILE — assert both are exactly as this test found
+        # them (see module docstring: those two files are the only ones
+        # this test suite is allowed to touch, and only via the L/T
+        # actions exercised below).
+        pre_lang = LANG_FILE.read_text() if LANG_FILE.exists() else None
+        pre_theme = THEME_FILE.read_text() if THEME_FILE.exists() else None
+        asyncio.run(_test_reattach_offer())
+        post_lang = LANG_FILE.read_text() if LANG_FILE.exists() else None
+        post_theme = THEME_FILE.read_text() if THEME_FILE.exists() else None
+        check("reattach offer test didn't touch LANG_FILE", pre_lang == post_lang)
+        check("reattach offer test didn't touch THEME_FILE", pre_theme == post_theme)
+
         asyncio.run(_test_cycle_lang())
         check("lang file was written by the L action", LANG_FILE.exists())
         asyncio.run(_test_cycle_theme())

@@ -9,7 +9,7 @@ under the plain system python3 (no textual installed) for
 tests/test_imports.py, exactly like the pre-split script only imported
 textual inside its picker function.
 """
-from sai import health, providers
+from sai import health, models, providers
 from sai.bigfont import render_big
 from sai.i18n import LANG_CODES, get_lang, set_lang, t
 from sai.paths import LANG_FILE, THEME_FILE
@@ -24,6 +24,14 @@ from sai.timeutil import fmt_ago
 # treating the result as a launch choice.
 _RESTART_LANG = "\x00restart-lang\x00"
 _RESTART_THEME = "\x00restart-theme\x00"
+
+# Same sentinel idea, different consumer: cmd_menu execs `tmux
+# attach-session` instead of relaunching a provider when it sees this one
+# back (see sai.session.wrap_launch's module docstring for why that exec,
+# not another wrap_launch call, is correct here — the session already
+# exists). Never collides with a real provider id (registry keys are
+# short lowercase names like "claude", never containing NUL).
+_REATTACH = "\x00reattach\x00"
 
 
 def textual_available():
@@ -50,25 +58,33 @@ def _sysinfo_markup(lines):
     return out
 
 
-def _health_for(p, statuses):
+def _health_for(p, statuses, service_states):
     """statuses.get(p) can in principle be None (a provider absent from
     the fetched-statuses map) even though every real call site builds
     `statuses` from the very same provider_list — defensive, not expected
     in practice. None is treated as ONLINE/no-reason rather than raising,
-    matching health.classify's own "unknown ≠ unhealthy" rule."""
+    matching health.classify's own "unknown ≠ unhealthy" rule.
+    service_states.get(p) is fine to be missing/None too — that's
+    classify()'s normal "no external signal" case, not an error."""
     status = statuses.get(p)
     if status is None:
         return health.ONLINE, None
-    return health.classify(p, status)
+    return health.classify(p, status, service_states.get(p))
 
 
-def _build_app(provider_list, statuses, theme_path):
+def _build_app(provider_list, statuses, service_states, theme_path, reattach=None):
     """Construct the picker App instance without running it. Split out of
     run_picker() below purely so tests/test_picker_headless.py can drive it
     through Textual's own `app.run_test()` pilot (which needs an
     unstarted instance, not the blocking `.run()` call) instead of a real
     terminal — run_picker()'s observable behavior is unchanged, it's still
-    exactly `_build_app(...).run()`."""
+    exactly `_build_app(...).run()`.
+
+    reattach: None, or {"windows": [(name, ago_str), ...], "peek_lines":
+    [...]} built by sai.cli (see its _reattach_descriptor()) from
+    sai.session's tmux calls — this module makes no tmux calls of its own,
+    it only renders whatever descriptor it's handed. When present, a
+    special reattach row is shown first in the OptionList."""
     from textual.app import App, ComposeResult
     from textual.containers import Vertical
     from textual.widgets import Footer, OptionList, Static
@@ -111,10 +127,19 @@ def _build_app(provider_list, statuses, theme_path):
             # offline instead of just hiding it.
             online_warn, offline = [], []
             for p in provider_list:
-                state, _ = _health_for(p, statuses)
+                state, _ = _health_for(p, statuses, service_states)
                 (offline if state == health.OFFLINE else online_warn).append((p, state))
 
             options = []
+            # Reattach offer goes first, before any provider row — it's
+            # "resume what's already running," a strictly higher-priority
+            # choice than "start something new" whenever it's on offer at
+            # all (see sai.cli._reattach_descriptor: only built when a
+            # live tmux session actually exists).
+            if reattach:
+                names = ", ".join(name for name, _ in reattach["windows"])
+                ago = reattach["windows"][0][1]
+                options.append(Option(t("session_reattach_label", names=names, ago=ago), id=_REATTACH))
             for p, state in online_warn:
                 label = providers.label(p)
                 if state == health.WARNING:
@@ -138,7 +163,9 @@ def _build_app(provider_list, statuses, theme_path):
             # OFFLINE provider that would otherwise sort first (most
             # recently used) gets pushed to the back. on_mount uses this
             # instead of provider_list[0] for that reason.
-            self._flat_ids = [p for p, _ in online_warn] + [p for p, _ in offline]
+            self._flat_ids = ([_REATTACH] if reattach else []) + [p for p, _ in online_warn] + [
+                p for p, _ in offline
+            ]
 
             # Deliberately simple: just the name. Detailed stats (quota
             # breakdown, tree, countdown, last used) only show for whichever
@@ -168,18 +195,28 @@ def _build_app(provider_list, statuses, theme_path):
             self.query_one("#sysline", Static).update(f"{t('menu_system_ready')} {block}")
 
         def _update_detail(self, p):
+            if p == _REATTACH:
+                # peek_lines is tmux capture-pane output (see
+                # sai.session.peek) — best-effort and can legitimately be
+                # empty (dead pane, capture failed), hence the fallback
+                # line instead of an empty detail panel.
+                lines = [t("session_reattach_detail_header")]
+                lines += reattach["peek_lines"] or [t("session_reattach_no_peek")]
+                self.query_one("#detail", Static).update("\n".join(lines))
+                return
             # No big block-letter name repeat here anymore — the OptionList
             # row already shows which provider is highlighted, so this
             # panel goes straight to what it actually adds: the stats.
             status = statuses.get(p)
-            state, reason_key = _health_for(p, statuses)
-            state_word = t(f"health_state_{state}")
-            # " — " is glue, not a phrase of its own — same convention as
-            # e.g. "status_last_used"'s "{label} — last used {ago}", just
-            # composed here from two already-localized pieces instead of
-            # one template, since the reason is only sometimes present.
-            health_line = state_word if reason_key is None else f"{state_word} — {t(reason_key)}"
+            state, reason_key = _health_for(p, statuses, service_states)
+            health_line = health.render_health_line(state, reason_key)
             lines = [health_line] + (render_status_rows(p, status) if status is not None else [])
+            # Models: read-only from cache (see sai.models' module
+            # docstring) — showing this line never triggers a fetch, so a
+            # provider nobody's ever run `models` for just shows nothing.
+            models_line = models.models_line(p)
+            if models_line:
+                lines.append(f"  {models_line}")
             last = providers.last_used_epoch(p)
             lines = lines + ["", t("last_used", ago=fmt_ago(last))]
             self.query_one("#detail", Static).update("\n".join(lines))
@@ -223,10 +260,15 @@ def _build_app(provider_list, statuses, theme_path):
     return _SelectorApp()
 
 
-def run_picker(provider_list, statuses, theme_path):
+def run_picker(provider_list, statuses, service_states, theme_path, reattach=None):
     """provider_list: order list of provider keys (see sai.cli.build_provider_list).
     statuses: {p: status dict} from fetch_all_statuses, used to render the
-    detail panel. Returns a provider id, None (deliberate quit), or one of
-    the _RESTART_* sentinels (language/theme changed from inside the
-    picker — see sai.cli.cmd_menu, which reloads and calls this again)."""
-    return _build_app(provider_list, statuses, theme_path).run()
+    detail panel. service_states: {p: "operational"|"degraded"|"outage"|
+    None} from fetch_service_states_cached, folded into classify() for
+    both the health line and the ONLINE/WARNING vs OFFLINE grouping.
+    reattach: see _build_app's docstring — None or a descriptor dict.
+    Returns a provider id, None (deliberate quit), _REATTACH (see
+    sai.cli.cmd_menu, which execs `tmux attach-session` on seeing this
+    back), or one of the _RESTART_* sentinels (language/theme changed from
+    inside the picker — cmd_menu reloads and calls this again)."""
+    return _build_app(provider_list, statuses, service_states, theme_path, reattach).run()

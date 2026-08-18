@@ -6,8 +6,9 @@ import os
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 
-from sai import auth, cache, providers
+from sai import auth, cache, health, models, providers, session
 from sai.i18n import cmd_lang, resolve_lang, set_lang, t
 from sai.paths import CHECK_ANTIGRAVITY_FILE, ENTRY_SCRIPT, LAUNCH_LOG, STATE_DIR, THEMES_DIR
 from sai.providers import antigravity
@@ -15,7 +16,7 @@ from sai.providers.base import render_status_rows
 from sai.sysinfo import machine_status, who_status
 from sai.themes import cmd_theme, current_theme
 from sai.timeutil import fmt_ago
-from sai.ui.picker import _RESTART_LANG, _RESTART_THEME, run_picker, textual_available
+from sai.ui.picker import _REATTACH, _RESTART_LANG, _RESTART_THEME, run_picker, textual_available
 from sai.ui.plain import run_plain_picker
 
 # ---------------------------------------------------------------------------
@@ -74,12 +75,30 @@ def log_launch(provider, mode):
         f.write(f"{int(time.time())}\t{provider}\t{mode}\n")
 
 
-def print_status_block(p, status):
+def print_status_block(p, status, service_state):
     last = providers.last_used_epoch(p)
     print(t("status_last_used", label=providers.label(p), ago=fmt_ago(last)))
+    state, reason_key = health.classify(p, status, service_state)
+    print(f"  {health.render_health_line(state, reason_key)}")
     for line in render_status_rows(p, status):
         print(line)
+    line = models.models_line(p)
+    if line:
+        print(f"  {line}")
     print()
+
+
+def _fetch_statuses_and_services(installed, force_refresh):
+    """Runs the quota-status probe and the service-status probe at the
+    same time (two threads, not two sequential blocking calls) so wiring
+    in the service check doesn't add wall time on top of what
+    fetch_all_statuses already took by itself — see docs/ARCHITECTURE.md's
+    health.py entry. Both callers below (cmd_status, build_provider_list)
+    need exactly this pair, so it's factored out here instead of repeated."""
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        fut_statuses = ex.submit(cache.fetch_all_statuses, installed, force_refresh, True)
+        fut_services = ex.submit(cache.fetch_service_states_cached, installed, force_refresh)
+        return fut_statuses.result(), fut_services.result()
 
 
 def cmd_status(args, force_refresh=False):
@@ -95,13 +114,13 @@ def cmd_status(args, force_refresh=False):
     print()
 
     installed = [p for p in providers.ORDER if providers.installed(p)]
-    statuses = cache.fetch_all_statuses(installed, force_refresh=force_refresh, show_progress=True)
+    statuses, service_states = _fetch_statuses_and_services(installed, force_refresh)
 
     for p in providers.ORDER:
         if not providers.installed(p):
             print(t("status_not_installed", label=providers.label(p)) + "\n")
             continue
-        print_status_block(p, statuses[p])
+        print_status_block(p, statuses[p], service_states.get(p))
 
 
 def build_provider_list(force_refresh=False):
@@ -109,13 +128,38 @@ def build_provider_list(force_refresh=False):
     and so on) — not the old quota-based "advisor" ranking (that stays
     off), just recency, which is simpler to predict: whatever you touched
     last is always at the top. Ties (e.g. two never-used providers) keep
-    providers.ORDER's own order. Returns (providers, statuses) — statuses
-    is {p: status dict}, used both for the plain picker's summary line and
-    the Textual picker's detail panel."""
+    providers.ORDER's own order. Returns (providers, statuses,
+    service_states) — statuses is {p: status dict}, service_states is
+    {p: "operational"|"degraded"|"outage"|None}, used by both the plain
+    picker's grouping and the Textual picker's detail panel/grouping."""
     installed = [p for p in providers.ORDER if providers.installed(p)]
-    statuses = cache.fetch_all_statuses(installed, force_refresh=force_refresh, show_progress=True)
+    statuses, service_states = _fetch_statuses_and_services(installed, force_refresh)
     installed.sort(key=lambda p: providers.last_used_epoch(p), reverse=True)
-    return installed, statuses
+    return installed, statuses, service_states
+
+
+def _reattach_descriptor():
+    """None, or {"windows": [(name, ago_str), ...], "peek_lines": [...]}
+    for whichever window was most recently active — the shape both
+    sai.ui.picker and sai.ui.plain render (they make no tmux calls of
+    their own, see each module's docstring). None whenever there's
+    nothing to reattach to: tmux missing, the feature toggled off, or no
+    live `selectorai` tmux session with at least one window.
+
+    live-unverified: exercises sai.session's tmux-facing calls end to
+    end, none of which have run against a real tmux binary on this
+    machine — see sai/session.py's module docstring."""
+    if not (session.available() and session.enabled()):
+        return None
+    windows = session.live_windows()
+    if not windows:
+        return None
+    windows.sort(key=lambda w: w[1], reverse=True)  # most recently active first
+    most_recent_name = windows[0][0]
+    return {
+        "windows": [(name, fmt_ago(epoch)) for name, epoch in windows],
+        "peek_lines": session.peek(most_recent_name),
+    }
 
 
 def _bootstrap_textual_venv():
@@ -173,7 +217,7 @@ def cmd_menu(argv, force_refresh=False):
                 os.execv(str(venv_python), [str(venv_python), str(ENTRY_SCRIPT)] + sys.argv[1:])
             print(t("menu_ui_failed"))
 
-    provider_list, statuses = build_provider_list(force_refresh=force_refresh)
+    provider_list, statuses, service_states = build_provider_list(force_refresh=force_refresh)
     if not provider_list:
         print(t("menu_none_installed", cmd=sys.argv[0]))
         sys.exit(1)
@@ -188,11 +232,18 @@ def cmd_menu(argv, force_refresh=False):
         # already rendered into `statuses` by the time it gets here.
         while True:
             theme_path = THEMES_DIR / f"{current_theme()}.tcss"
-            result = run_picker(provider_list, statuses, theme_path)
+            # Recomputed every loop iteration (cheap: at most two tmux
+            # subprocess calls, see sai.session.live_windows/peek), not
+            # hoisted above the loop — a language/theme restart reopens
+            # the same picker in place, and the reattach offer should
+            # reflect the session's live state at that moment, same as
+            # provider statuses already do on a lang restart.
+            reattach = _reattach_descriptor()
+            result = run_picker(provider_list, statuses, service_states, theme_path, reattach=reattach)
             if result == _RESTART_THEME:
                 continue
             if result == _RESTART_LANG:
-                provider_list, statuses = build_provider_list(force_refresh=True)
+                provider_list, statuses, service_states = build_provider_list(force_refresh=True)
                 continue
             chosen = result
             break
@@ -202,14 +253,25 @@ def cmd_menu(argv, force_refresh=False):
         if chosen is None:
             sys.exit(0)
     else:
-        chosen = run_plain_picker(provider_list, statuses)
+        reattach = _reattach_descriptor()
+        chosen = run_plain_picker(provider_list, statuses, service_states, reattach=reattach)
         if chosen is None:
             print(t("menu_invalid"))
             sys.exit(1)
 
+    if chosen == _REATTACH:
+        # Same "exec'd, never piped" rule as provider launches (see
+        # docs/ARCHITECTURE.md rule 3) — tmux attach-session takes over
+        # this terminal exactly like the CLIs it wraps. Never returns on
+        # success; no log_launch call here, this isn't a new launch.
+        # live-unverified: see sai/session.py's module docstring.
+        os.execvp("tmux", ["tmux", "attach-session", "-t", session.SESSION_NAME])
+
     mode = "yolo" if yolo else "auto"
     if cont:
         mode += "+continue"
+    if session.should_wrap():
+        mode += "+tmux"
     log_launch(chosen, mode)
     providers.launch(chosen, yolo, prompt, cont)
 
@@ -281,7 +343,20 @@ def main():
         auth.cmd_auth(argv[1:])
     elif argv and argv[0] == "check-antigravity":
         cmd_check_antigravity(argv[1:])
+    elif argv and argv[0] == "background":
+        session.cmd_background(argv[1:])
+    elif argv and argv[0] == "models":
+        models.cmd_models(argv[1:])
     elif argv and argv[0] == "theme":
         cmd_theme(argv[1:])
+    elif argv and argv[0] == "setup":
+        # Deferred import, not top-level: sai/installer.py imports
+        # cmd_status from this module to reuse it (see installer.py's
+        # module docstring) — a top-level import here would be a real
+        # import cycle, since this module wouldn't finish defining
+        # cmd_status before sai.installer needed it.
+        from sai.installer import cmd_setup
+
+        cmd_setup(argv[1:])
     else:
         cmd_menu(argv, force_refresh=force_refresh)

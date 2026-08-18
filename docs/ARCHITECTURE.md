@@ -21,6 +21,7 @@ sai/                     # the Python package (all logic lives here)
   cache.py               # status cache (per-provider TTLs), TerminalProgress, fetch_all_statuses
   health.py              # online/warning/offline classification + service-status probes
   models.py              # per-provider model listing (safe sources only, long cache)
+  session.py             # tmux background-session persistence: wrap_launch, reattach descriptor, cmd_background
   auth.py                # login capture with clean-URL reconstruction, cmd_auth
   installer.py           # cmd_setup: guided end-to-end onboarding
   cli.py                 # main(): global flags, dispatch, cmd_menu, cmd_status, venv bootstrap/re-exec

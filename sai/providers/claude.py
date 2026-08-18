@@ -4,18 +4,29 @@ import re
 import subprocess
 from pathlib import Path
 
+from sai import session
 from sai.i18n import t
 from sai.providers.base import _extract
 from sai.timeutil import _reset_with_countdown
 
 NAME = "claude"
-LABEL = "Claude Code"
+LABEL = "Claude Code (Anthropic)"
 BIN = "claude"
 INSTALL_CMD = "curl -fsSL https://claude.ai/install.sh | bash"
 UPDATE_CMD = ["claude", "update"]
 # Verified against `claude auth --help` -> `login` subcommand.
 LOGIN_CMD = ["claude", "auth", "login"]
 LOGIN_STATUS_CMD = ["claude", "auth", "status"]
+
+# `claude models --help` (verified 2026-08-17, local audit) has no
+# dedicated `models` subcommand at all — it just reprints the general
+# --help text. The only place model names show up anywhere in the CLI is
+# the --help text's own alias list. MODELS_STATIC (read by sai.models,
+# not part of the provider contract itself) tells callers this list came
+# from that static text, not a live query, so they can say so instead of
+# implying it's fresh.
+MODELS_STATIC = True
+_STATIC_MODEL_ALIASES = ["fable", "opus", "sonnet", "haiku"]
 
 
 def last_used_epoch():
@@ -50,6 +61,13 @@ def status():
     return {"pct_used": pct_used, "rows": rows, "note": None, "kind": "ok"}
 
 
+def list_models():
+    # Static, not a probe — see MODELS_STATIC above for why there's
+    # nothing to safely call here. list(...) so callers can't mutate the
+    # module-level constant through the returned list.
+    return list(_STATIC_MODEL_ALIASES)
+
+
 def launch(yolo, prompt, cont):
     # Default: --permission-mode auto — Claude Code's own classifier
     # (rules-based allow/soft_deny/hard_deny, see `claude auto-mode
@@ -65,4 +83,8 @@ def launch(yolo, prompt, cont):
     print(t("launch_claude", flags=" ".join(args[1:])))
     if prompt:
         args.append(prompt)
+    # See sai/providers/codex.py's launch() comment: routed through
+    # wrap_launch so a persisted `background on` runs this inside a
+    # reattachable tmux session — no-op passthrough otherwise.
+    args = session.wrap_launch(NAME, args)
     os.execvp(args[0], args)

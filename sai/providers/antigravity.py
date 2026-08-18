@@ -13,7 +13,9 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
+from sai import session
 from sai.i18n import t
+from sai.providers.base import parse_model_lines
 from sai.timeutil import _reset_with_countdown
 
 NAME = "antigravity"
@@ -102,6 +104,25 @@ def status():
     return {"pct_used": pct_used, "rows": rows, "note": None, "kind": "ok"}
 
 
+def list_models():
+    # `agy models --help` -> "List available models" (flags only
+    # -h/--help — verified 2026-08-17, local audit). That confirms the
+    # subcommand *exists*; it does NOT confirm the bare invocation is
+    # auth-safe — same failure class as `agy -p /usage` above (a dropped
+    # session can trigger a real Google OAuth browser popup), just
+    # unverified rather than confirmed-bad. So this function is safe to
+    # *define* but callers must only reach it from the explicit `models`
+    # subcommand (sai.models.cmd_models) — never from status/menu code,
+    # same rule as this module's status() gate, just enforced by the
+    # caller instead of a _check_enabled flag here (there's no cached
+    # "skip" state that would make sense for an explicit one-shot command).
+    try:
+        out = subprocess.run(["agy", "models"], capture_output=True, text=True, timeout=10).stdout
+    except Exception:
+        return None
+    return parse_model_lines(out)
+
+
 def launch(yolo, prompt, cont):
     args = ["agy", "--dangerously-skip-permissions"]
     if cont:
@@ -109,4 +130,8 @@ def launch(yolo, prompt, cont):
     print(t("launch_antigravity", flags=" ".join(args[1:])))
     if prompt:
         args += ["--prompt-interactive", prompt]
+    # See sai/providers/codex.py's launch() comment: routed through
+    # wrap_launch so a persisted `background on` runs this inside a
+    # reattachable tmux session — no-op passthrough otherwise.
+    args = session.wrap_launch(NAME, args)
     os.execvp(args[0], args)

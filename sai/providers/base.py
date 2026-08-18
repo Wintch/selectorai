@@ -35,6 +35,43 @@ def _extract(text, pattern, flags=0):
     return m.group(1) if m else None
 
 
+# Header/decoration line heuristics for parse_model_lines below. Not
+# exhaustive by design — this is defensive parsing for output shapes that
+# are UNVERIFIED (see sai/providers/antigravity.py and grok.py's
+# list_models()), so it only strips things that are clearly not a model
+# name rather than trying to enumerate every real header string.
+_DECORATION_RE = re.compile(r"^[-=_*~#]+$")
+_HEADER_WORDS = {"available models:", "available models", "models:", "model", "name"}
+
+
+def parse_model_lines(text):
+    """Defensively turn a `models`-subcommand's free-form stdout into a
+    flat list of model name strings: strip each line, drop empty lines,
+    drop obvious decoration (a line that's only "-"/"="/etc) or column
+    headers, and keep everything else as-is. Shared by
+    sai/providers/antigravity.py and grok.py, whose `models` output shape
+    neither one has actually been run against yet (their bare invocation
+    risks a real auth popup — see each module's list_models() docstring —
+    so this was written against the *documented* "list models" behavior,
+    not a captured real transcript)."""
+    names = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if _DECORATION_RE.match(line):
+            continue
+        if line.lower() in _HEADER_WORDS:
+            continue
+        # A short line ending in ":" reads as a section header ("Claude
+        # models:"), not a model name — real model names/ids don't end
+        # with a bare colon.
+        if line.endswith(":") and len(line.split()) <= 3:
+            continue
+        names.append(line)
+    return names
+
+
 def _render_tree(header, rows):
     lines = [t("status_tree_header", label=header)]
     for i, (label, used, reset) in enumerate(rows):

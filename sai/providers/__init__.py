@@ -56,3 +56,12 @@ def status(p):
 
 def launch(p, yolo, prompt, cont):
     registry[p].launch(yolo, prompt, cont)
+
+
+def list_models(p):
+    # No try/except here on purpose: unlike status(), which callers rely
+    # on never raising (fetch_all_statuses wraps it defensively instead),
+    # list_models() is only ever called from sai.models.cmd_models, an
+    # explicit one-shot command where a real traceback on an unexpected
+    # failure is more useful than silently returning None.
+    return registry[p].list_models()

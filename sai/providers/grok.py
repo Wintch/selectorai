@@ -5,9 +5,12 @@ precautionary) that there's no live usage check to gate in the first
 place — see status() below for why.
 """
 import os
+import subprocess
 from pathlib import Path
 
+from sai import session
 from sai.i18n import t
+from sai.providers.base import parse_model_lines
 
 NAME = "grok"
 LABEL = "Grok Build (xAI)"
@@ -71,6 +74,20 @@ def status():
     return {"pct_used": None, "rows": [], "note": t("note_grok_no_headless_usage"), "kind": "no-usage-api"}
 
 
+def list_models():
+    # `grok models --help` -> "List available models and exit" (verified
+    # 2026-08-17, local audit: full `grok --help` command list). Same
+    # caution class as Antigravity's list_models() above: the subcommand's
+    # *existence* is confirmed, its auth behavior on a bare invocation is
+    # not — this account has never run it. Callers must only reach this
+    # from the explicit `models` subcommand, never status/menu code.
+    try:
+        out = subprocess.run(["grok", "models"], capture_output=True, text=True, timeout=10).stdout
+    except Exception:
+        return None
+    return parse_model_lines(out)
+
+
 def launch(yolo, prompt, cont):
     # Same preset shape as Claude: --permission-mode auto by default —
     # confirmed via `grok --help`, same enum as Claude's (default/
@@ -85,4 +102,8 @@ def launch(yolo, prompt, cont):
     print(t("launch_grok", flags=" ".join(args[1:])))
     if prompt:
         args.append(prompt)
+    # See sai/providers/codex.py's launch() comment: routed through
+    # wrap_launch so a persisted `background on` runs this inside a
+    # reattachable tmux session — no-op passthrough otherwise.
+    args = session.wrap_launch(NAME, args)
     os.execvp(args[0], args)

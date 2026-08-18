@@ -4,6 +4,7 @@ from sai.i18n import _prompt, t
 from sai.providers.base import provider_summary
 from sai.sysinfo import machine_status
 from sai.timeutil import fmt_ago
+from sai.ui.picker import _REATTACH
 
 _MISSING_STATUS = {"pct_used": None, "rows": [], "note": None, "kind": None}
 
@@ -18,17 +19,39 @@ def _print_rows(provider_ids, statuses, menu_provider, start):
         status = statuses.get(p, _MISSING_STATUS)
         summary = provider_summary(status)
         last = providers.last_used_epoch(p)
-        print(f"  {i}) {providers.label(p):<22} {summary:<55} {t('last_used', ago=fmt_ago(last))}")
+        # 25, not 22: the longest LABEL is now "Claude Code (Anthropic)"
+        # (23 chars, see sai/providers/claude.py) since every provider
+        # label gained a "(Parent Company)" suffix — widened to keep the
+        # same >=2-space gap before the summary column that 22 gave the
+        # old, shorter labels.
+        print(f"  {i}) {providers.label(p):<25} {summary:<55} {t('last_used', ago=fmt_ago(last))}")
         menu_provider[i] = p
         i += 1
     return i
 
 
-def run_plain_picker(provider_list, statuses):
+def run_plain_picker(provider_list, statuses, service_states, reattach=None):
+    """reattach: None, or the {"windows": [(name, ago_str), ...],
+    "peek_lines": [...]} descriptor sai.cli._reattach_descriptor()
+    builds from sai.session's tmux calls — this module makes no tmux
+    calls of its own, same purity rule as sai/ui/picker.py. When present,
+    it's offered as entry "0)", ahead of the numbered provider rows
+    (which start at 1, unchanged) — same priority-first placement as the
+    Textual picker's reattach row."""
     for line in machine_status():
         print(line)
     print(t("who_hint", cmd="selectorai.py status --who"))
     print()
+
+    menu_provider = {}
+    if reattach:
+        names = ", ".join(name for name, _ in reattach["windows"])
+        ago = reattach["windows"][0][1]
+        print(f"  0) {t('session_reattach_label', names=names, ago=ago)}")
+        for line in reattach["peek_lines"] or [t("session_reattach_no_peek")]:
+            print(f"       {line}")
+        menu_provider[0] = _REATTACH
+        print()
 
     # Same grouping as sai/ui/picker.py's sectioned OptionList, done
     # textually instead: an "Available:" group for ONLINE/WARNING
@@ -38,12 +61,11 @@ def run_plain_picker(provider_list, statuses):
     # this menu doesn't need a second signal for the same fact.
     online_warn, offline = [], []
     for p in provider_list:
-        state, _ = health.classify(p, statuses.get(p, _MISSING_STATUS))
+        state, _ = health.classify(p, statuses.get(p, _MISSING_STATUS), service_states.get(p))
         (offline if state == health.OFFLINE else online_warn).append(p)
 
     print(t("menu_available"))
     print()
-    menu_provider = {}
     next_i = _print_rows(online_warn, statuses, menu_provider, start=1)
 
     if offline:

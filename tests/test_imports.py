@@ -44,9 +44,12 @@ def main():
     import sai.themes  # noqa: F401
     import sai.timeutil  # noqa: F401
     import sai.sysinfo  # noqa: F401
+    import sai.health  # noqa: F401
     import sai.cache  # noqa: F401
     import sai.auth  # noqa: F401
+    import sai.models  # noqa: F401
     import sai.cli  # noqa: F401
+    import sai.installer  # noqa: F401
     import sai.providers  # noqa: F401
     import sai.providers.base  # noqa: F401
     import sai.providers.claude  # noqa: F401

@@ -8,7 +8,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from sai import providers
+from sai import health, providers
 from sai.i18n import t
 from sai.paths import CACHE_FILE
 from sai.providers import antigravity
@@ -177,3 +177,51 @@ def fetch_all_statuses(provider_list, force_refresh=False, show_progress=True):
 
     save_cache(cache)
     return statuses
+
+
+# Service-status probes (sai.health.fetch_service_states) are a different
+# cadence than quota statuses: a status.io/incident.io outage doesn't flap
+# minute to minute, and hitting three external status pages on every menu
+# open for no reason is just needless network traffic and startup latency.
+# 300s isn't in _CACHE_TTL_OVERRIDES above because that dict is keyed by
+# provider name under the "statuses" cache key — this is a wholly separate
+# "service" key with its own single TTL for every probed provider, not a
+# per-provider override of the quota-status cache.
+SERVICE_CACHE_TTL = 300
+
+
+def fetch_service_states_cached(provider_list, force_refresh=False):
+    """Same cache-then-probe shape as fetch_all_statuses above, applied to
+    sai.health.fetch_service_states instead of providers.status. Returns
+    {p: state} for every p in provider_list — providers with no real probe
+    (see health.SERVICE_PROBED_PROVIDERS; currently just "grok") short-
+    circuit straight to None without a cache read/write, since there's
+    nothing to cache."""
+    now = time.time()
+    cache = load_cache() if not force_refresh else {}
+    cached_map = cache.get("service", {})
+
+    states = {}
+    to_query = []
+    for p in provider_list:
+        if p not in health.SERVICE_PROBED_PROVIDERS:
+            states[p] = None
+            continue
+        if not force_refresh and p in cached_map:
+            entry = cached_map[p]
+            ts = entry.get("timestamp", 0)
+            if now - ts < SERVICE_CACHE_TTL:
+                states[p] = entry.get("state")
+                continue
+        to_query.append(p)
+
+    if not to_query:
+        return states
+
+    fresh = health.fetch_service_states(to_query)
+    cache.setdefault("service", {})
+    for p, state in fresh.items():
+        states[p] = state
+        cache["service"][p] = {"timestamp": int(now), "state": state}
+    save_cache(cache)
+    return states

@@ -5,12 +5,12 @@ import subprocess
 import time
 from pathlib import Path
 
-from sai import paths
+from sai import paths, session
 from sai.i18n import t
 from sai.timeutil import _reset_with_countdown
 
 NAME = "codex"
-LABEL = "Codex CLI"
+LABEL = "Codex CLI (OpenAI)"
 BIN = "codex"
 INSTALL_CMD = "curl -fsSL https://chatgpt.com/codex/install.sh | sh"
 UPDATE_CMD = ["codex", "update"]
@@ -82,6 +82,14 @@ def clear_codex_ratelimit():
     (paths.STATE_DIR / "codex.ratelimited.until").unlink(missing_ok=True)
 
 
+def list_models():
+    # No `models` subcommand anywhere in `codex --help` (verified
+    # 2026-08-17, local audit) — model choice is only ever a `-m <name>`
+    # flag on individual invocations, with no enumerable list exposed by
+    # the CLI at all. Nothing to return.
+    return None
+
+
 def launch(yolo, prompt, cont):
     if yolo:
         print(t("launch_codex_yolo"))
@@ -97,5 +105,9 @@ def launch(yolo, prompt, cont):
     if prompt:
         args.append(prompt)
     # exec'd, same as claude/agy — Codex is a full-screen TUI and checks
-    # isatty(stdout) at startup.
+    # isatty(stdout) at startup. Routed through wrap_launch so a persisted
+    # `background on` (see sai/session.py) transparently runs this inside
+    # a reattachable tmux session instead — a no-op argv passthrough when
+    # tmux is unavailable/disabled/already-nested.
+    args = session.wrap_launch(NAME, args)
     os.execvp(args[0], args)
