@@ -85,5 +85,14 @@
   "progress_connecting": "Подключение к AI-провайдерам...",
   "progress_checking": "Проверка {provider}...",
   "progress_done": "Готово",
-  "progress_cached": "Используются кэшированные данные"
+  "progress_cached": "Используются кэшированные данные",
+  "health_section_offline": "── ОФЛАЙН ──",
+  "health_state_online": "В сети",
+  "health_state_warning": "Предупреждение",
+  "health_state_offline": "Офлайн",
+  "health_reason_auth": "требуется вход",
+  "health_reason_quota": "квота исчерпана",
+  "health_reason_low_quota": "квота на исходе",
+  "health_reason_service": "сбой сервиса",
+  "health_reason_degraded": "сервис работает нестабильно"
 }

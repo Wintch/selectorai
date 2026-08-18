@@ -85,5 +85,14 @@
   "progress_connecting": "Connecting to AI providers...",
   "progress_checking": "Checking {provider}...",
   "progress_done": "Ready",
-  "progress_cached": "Using cached status"
+  "progress_cached": "Using cached status",
+  "health_section_offline": "── OFFLINE ──",
+  "health_state_online": "Online",
+  "health_state_warning": "Warning",
+  "health_state_offline": "Offline",
+  "health_reason_auth": "login required",
+  "health_reason_quota": "quota exhausted",
+  "health_reason_low_quota": "low quota",
+  "health_reason_service": "service outage",
+  "health_reason_degraded": "service degraded"
 }

@@ -85,5 +85,14 @@
   "progress_connecting": "Conectando con proveedores de IA...",
   "progress_checking": "Verificando {provider}...",
   "progress_done": "Listo",
-  "progress_cached": "Usando estado en caché"
+  "progress_cached": "Usando estado en caché",
+  "health_section_offline": "── FUERA DE LÍNEA ──",
+  "health_state_online": "En línea",
+  "health_state_warning": "Advertencia",
+  "health_state_offline": "Fuera de línea",
+  "health_reason_auth": "necesita iniciar sesión",
+  "health_reason_quota": "cuota agotada",
+  "health_reason_low_quota": "cuota baja",
+  "health_reason_service": "caída del servicio",
+  "health_reason_degraded": "servicio degradado"
 }
