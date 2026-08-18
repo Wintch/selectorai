@@ -84,10 +84,14 @@ list_models()     # -> list[str] | None
 
 7. **Find the auto-approve ("yolo") flag and its safer default**, and add
    a row to the auto-mode table in
-   [`docs/NOTES.md`](NOTES.md#auto-mode-flags-per-provider). Every
-   existing provider has a "safer default" (some kind of workspace-scoped
+   [`docs/NOTES.md`](NOTES.md#auto-mode-flags-per-provider). Most
+   existing providers have a "safer default" (some kind of workspace-scoped
    or classifier-based approval) plus a `--yolo`-triggered full bypass —
-   match that shape rather than only wiring up the dangerous flag.
+   match that shape rather than only wiring up the dangerous flag, unless
+   the underlying CLI genuinely has no safer mode to fall back on (see
+   Antigravity's row in the same table: `agy` exposes no classifier-based
+   auto mode, so it sends `--dangerously-skip-permissions` unconditionally
+   — a documented exception, not something to copy by default).
 
 8. **Find the resume flag** (`-c`/`--continue`, or the CLI's own
    equivalent) and confirm whether it's a flag or a subcommand (Codex's

@@ -95,6 +95,27 @@ def save_cache(cache):
         pass
 
 
+# cache.json holds multiple independent top-level sections ("statuses",
+# "service", ...) written by different fetch_*_cached functions that
+# sai.cli._fetch_statuses_and_services runs concurrently in two threads.
+# Each function's own load_cache() call earlier (used only to decide what's
+# still fresh) can be stale by the time it's ready to write: if it just did
+# save_cache(cache) with that stale in-memory dict, it would silently wipe
+# out whatever section the other thread wrote in the meantime — same file,
+# last writer wins, whole-file overwrite. _merge_save closes that window:
+# the lock serializes the two threads' writes, and reloading the file
+# *inside* the lock (not reusing the caller's earlier snapshot) means each
+# writer only ever replaces its own section, never the other's.
+_CACHE_WRITE_LOCK = threading.Lock()
+
+
+def _merge_save(section, data):
+    with _CACHE_WRITE_LOCK:
+        cache = load_cache()
+        cache[section] = data
+        save_cache(cache)
+
+
 # Antigravity gets a much longer cache window than everything else — not
 # for freshness (a weekly quota doesn't need per-minute updates), but as a
 # backoff: its own session handling is flaky upstream (antigravity-cli
@@ -157,6 +178,11 @@ def fetch_all_statuses(provider_list, force_refresh=False, show_progress=True):
         initial_title = t("progress_connecting")
         progress = TerminalProgress(len(to_query), title=initial_title)
 
+    # Built from cached_map (this function's own earlier read), then only
+    # ever handed to _merge_save — never to save_cache(cache) directly,
+    # since `cache` itself may be stale by the time we're done querying
+    # (see _merge_save's docstring above).
+    section = dict(cached_map)
     with ThreadPoolExecutor(max_workers=len(to_query)) as ex:
         fut_to_p = {ex.submit(providers.status, p): p for p in to_query}
         for fut in as_completed(fut_to_p):
@@ -166,16 +192,14 @@ def fetch_all_statuses(provider_list, force_refresh=False, show_progress=True):
             except Exception as e:
                 st = {"pct_used": None, "rows": [], "note": str(e), "kind": "no-usage-api"}
             statuses[p] = st
-            if "statuses" not in cache:
-                cache["statuses"] = {}
-            cache["statuses"][p] = {"timestamp": int(now), "status": st}
+            section[p] = {"timestamp": int(now), "status": st}
             if progress:
                 progress.update(1, text=t("progress_checking", provider=providers.label(p)))
 
     if progress:
         progress.finish(clear=True)
 
-    save_cache(cache)
+    _merge_save("statuses", section)
     return statuses
 
 
@@ -219,9 +243,9 @@ def fetch_service_states_cached(provider_list, force_refresh=False):
         return states
 
     fresh = health.fetch_service_states(to_query)
-    cache.setdefault("service", {})
+    section = dict(cached_map)
     for p, state in fresh.items():
         states[p] = state
-        cache["service"][p] = {"timestamp": int(now), "state": state}
-    save_cache(cache)
+        section[p] = {"timestamp": int(now), "state": state}
+    _merge_save("service", section)
     return states

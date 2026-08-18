@@ -1,5 +1,5 @@
 """Numbered fallback menu: no tty, or the Textual UI couldn't be set up."""
-from sai import health, providers
+from sai import health, models, providers
 from sai.i18n import _prompt, t
 from sai.providers.base import provider_summary
 from sai.sysinfo import machine_status
@@ -9,11 +9,15 @@ from sai.ui.picker import _REATTACH
 _MISSING_STATUS = {"pct_used": None, "rows": [], "note": None, "kind": None}
 
 
-def _print_rows(provider_ids, statuses, menu_provider, start):
+def _print_rows(provider_ids, statuses, classified, menu_provider, start):
     """Print one numbered row per provider, starting the running count at
     `start` — shared by both sections below so numbering stays continuous
     across the online/offline split (picking by number must still work for
-    every provider, offline ones included)."""
+    every provider, offline ones included). `classified` is {p: (state,
+    reason_key)}, computed once by the caller (same classify() call it
+    already needs for the online/offline grouping) and reused here so the
+    health word/reason and the section a provider lands in can never
+    disagree with each other."""
     i = start
     for p in provider_ids:
         status = statuses.get(p, _MISSING_STATUS)
@@ -25,6 +29,18 @@ def _print_rows(provider_ids, statuses, menu_provider, start):
         # same >=2-space gap before the summary column that 22 gave the
         # old, shorter labels.
         print(f"  {i}) {providers.label(p):<25} {summary:<55} {t('last_used', ago=fmt_ago(last))}")
+        # Indented detail lines below the numbered row, same information
+        # the Textual picker's detail panel and `status` command show
+        # (see sai/ui/picker.py's _update_detail, sai/cli.py's
+        # print_status_block) — the plain menu is the one other surface
+        # a provider's health/models can appear on, and it shouldn't be
+        # strictly less informative than either of those just because
+        # there's no tty for Textual.
+        state, reason_key = classified[p]
+        print(f"       {health.render_health_line(state, reason_key)}")
+        models_line = models.models_line(p)
+        if models_line:
+            print(f"       {models_line}")
         menu_provider[i] = p
         i += 1
     return i
@@ -57,22 +73,27 @@ def run_plain_picker(provider_list, statuses, service_states, reattach=None):
     # textually instead: an "Available:" group for ONLINE/WARNING
     # providers, then — only if any exist — an offline group. No ⚠
     # marker here (unlike the picker's row label): provider_summary()
-    # already surfaces the pct/quota numbers that made it WARNING, so
-    # this menu doesn't need a second signal for the same fact.
+    # already surfaces the pct/quota numbers that made it WARNING, and
+    # each row's own health line (see _print_rows) now spells out the
+    # ONLINE/WARNING/OFFLINE word and reason explicitly anyway.
+    classified = {
+        p: health.classify(p, statuses.get(p, _MISSING_STATUS), service_states.get(p))
+        for p in provider_list
+    }
     online_warn, offline = [], []
     for p in provider_list:
-        state, _ = health.classify(p, statuses.get(p, _MISSING_STATUS), service_states.get(p))
+        state, _ = classified[p]
         (offline if state == health.OFFLINE else online_warn).append(p)
 
     print(t("menu_available"))
     print()
-    next_i = _print_rows(online_warn, statuses, menu_provider, start=1)
+    next_i = _print_rows(online_warn, statuses, classified, menu_provider, start=1)
 
     if offline:
         print()
         print(t("health_section_offline"))
         print()
-        _print_rows(offline, statuses, menu_provider, start=next_i)
+        _print_rows(offline, statuses, classified, menu_provider, start=next_i)
 
     print()
     choice = (_prompt(t("menu_pick_prompt", n=len(provider_list))) or "").strip() or "1"

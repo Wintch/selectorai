@@ -359,7 +359,8 @@ never actually been captured, since running either command risked the same
 OAuth-popup class of problem as the quota probes.
 
 Results are cached in `~/.selectorai/cache.json` for 7 days and shown as a
-one-line `Models: ...` in the picker's detail panel and plain `status` —
+one-line `Models: ...` in the picker's detail panel, plain `status`, and the
+plain fallback menu (`sai/ui/plain.py`, used with no tty or no Textual) —
 that display is read-only and never triggers a fetch; run `models` again
 to refresh it.
 

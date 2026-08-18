@@ -172,8 +172,9 @@ hook that runs at the start of an SSH session. Concretely:
 
 - **Versioned, machine-readable status output** (from caut's `caut.v1`
   schema idea) — selectorai's `status()` provider contract already
-  returns a stable dict shape (`pct_used`, `rows`, `note`); documented in
-  `docs/ARCHITECTURE.md` as a contract, not an incidental return value.
+  returns a stable dict shape (`pct_used`, `rows`, `note`, `kind`);
+  documented in `docs/ARCHITECTURE.md` as a contract, not an incidental
+  return value.
 - **Per-provider data-source strategy with graceful degradation** (from
   caut and Ollama/local-model detection) — selectorai's `health.py`
   classifies online/warning/offline and never crashes the whole status

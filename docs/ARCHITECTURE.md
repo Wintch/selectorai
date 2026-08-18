@@ -65,7 +65,8 @@ Each `sai/providers/<name>.py` module exposes:
 ```python
 {"pct_used": int | None,          # worst-case % used across buckets, None = unknown
  "rows": [(label, pct_used, reset_info), ...],   # one row per quota bucket
- "note": str | None}              # shown when rows is empty
+ "note": str | None,              # shown when rows is empty
+ "kind": "ok" | "auth-needed" | "not-checked" | "no-usage-api"}  # why it looks this way
 ```
 
 Adding a provider = one new module + one entry in `providers/__init__.py`
