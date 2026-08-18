@@ -2,14 +2,17 @@
 """Plain-python3 test: sai.models (the `models` subcommand + read-only
 cache helpers) and each provider's list_models().
 
-Safety, matching test_status_shapes.py's approach exactly (this machine
-actually has claude/codex/agy/grok installed — see ABSOLUTE SAFETY RULES
-in the task this was built from): subprocess.run is monkeypatched for the
-ENTIRE file with a fake that raises on anything not explicitly canned, so
-a bug that would otherwise shell out to a real `agy`/`grok` binary fails
-the test loudly instead of silently making a live call (which for
-antigravity/grok's `models` subcommand could pop a real OAuth browser
-window, same failure class as `agy -p /usage`).
+Safety, matching test_status_shapes.py's approach exactly (see ABSOLUTE
+SAFETY RULES in the task this was built from): subprocess.run is
+monkeypatched for the ENTIRE file with a fake that raises on anything not
+explicitly canned, so a bug that would otherwise shell out to a real
+`agy`/`grok` binary fails the test loudly instead of silently making a
+live call (which for antigravity/grok's `models` subcommand could pop a
+real OAuth browser window, same failure class as `agy -p /usage`). This
+holds regardless of which providers are actually installed on the machine
+running the suite — test_cmd_models_writes_cache_for_all_providers also
+monkeypatches providers.installed() so its 4-provider assertions don't
+depend on real PATH contents.
 
 Cache tests point sai.cache.CACHE_FILE (not sai.paths.CACHE_FILE — see
 sai/cache.py, which binds CACHE_FILE at import time via `from sai.paths
@@ -320,14 +323,18 @@ def test_cmd_models_no_caution_for_claude_only():
 
 
 def test_cmd_models_writes_cache_for_all_providers(monkeypatch_run):
-    # No args -> every provider in providers.ORDER. All four binaries are
-    # actually installed on this machine (see module docstring), so this
-    # is the real code path providers.installed() takes in production —
-    # subprocess.run is fully stubbed so it can never reach a real CLI.
+    # No args -> every provider in providers.ORDER. providers.installed()
+    # is monkeypatched to report all four as installed regardless of what
+    # this machine actually has (a prior version of this test instead
+    # relied on all four binaries genuinely being on PATH, which broke on
+    # any machine missing one, e.g. no `grok`) — subprocess.run is fully
+    # stubbed so it can never reach a real CLI either way.
     monkeypatch_run({
         ("agy", "models"): "gemini-2.5-pro\n",
         ("grok", "models"): "grok-4\n",
     })
+    orig_installed = providers.installed
+    providers.installed = lambda p: True
     with tempfile.TemporaryDirectory() as tmp:
         orig_cache_file = cache_mod.CACHE_FILE
         cache_mod.CACHE_FILE = Path(tmp) / "cache.json"
@@ -345,6 +352,7 @@ def test_cmd_models_writes_cache_for_all_providers(monkeypatch_run):
             check("every entry has a numeric timestamp", all(isinstance(v["timestamp"], int) for v in saved.values()))
         finally:
             cache_mod.CACHE_FILE = orig_cache_file
+            providers.installed = orig_installed
 
 
 def main():
