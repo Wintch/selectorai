@@ -1,0 +1,42 @@
+/* "custom" — user-picked palette: white title (top only — everything else
+   keeps its own accent color), white body text (picker list + system
+   readout), light-brown borders/chrome, light green detail/usage panel.
+   The disk/memory warning word inside the system readout stays yellow
+   even though the rest of that panel is white — that one can't be done in
+   CSS alone (Textual CSS can't target a substring inside one Static
+   widget's text), so the app wraps just the "⚠ ..." tail of a warning
+   line in Rich markup ([yellow]...[/yellow]) before setting it, only in
+   this render path — the plain-text `status`/fallback-menu output is
+   untouched. */
+
+Screen { background: black; color: white; }
+
+#title { color: white; text-style: bold; padding: 1 0 0 2; }
+
+#sysbox {
+    border: round #c19a6b;
+    margin: 0 2 1 2;
+    padding: 0 1;
+    height: auto;
+}
+#sysline { color: #c19a6b; text-style: bold; }
+#sysinfo { color: white; }
+
+OptionList {
+    background: black;
+    color: white;
+    border: round #c19a6b;
+    height: auto;
+    max-height: 12;
+    margin: 0 2;
+}
+OptionList > .option-list--option-highlighted {
+    background: #c19a6b;
+    color: black;
+    text-style: bold;
+    transition: background 200ms in_out_cubic;
+}
+
+#detail { color: #90ee90; text-style: bold; padding: 1 2; min-height: 8; }
+
+Footer { background: black; color: #c19a6b; }

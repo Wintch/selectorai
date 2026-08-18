@@ -1,0 +1,36 @@
+/* "nostromo" — cyan multi-color CRT. Reference: the Nostromo's
+   "DEORBITAL DESCENT" navigation display — cyan-bordered rectangular
+   (sharp-cornered, not rounded) boxed panels on black, amber/red accents
+   on the readout data instead of a single monochrome color. */
+
+Screen { background: black; color: #4fd8ff; }
+
+#title { color: #4fd8ff; text-style: bold; padding: 1 0 0 2; }
+
+#sysbox {
+    border: solid #2a8fb0;
+    margin: 0 2 1 2;
+    padding: 0 1;
+    height: auto;
+}
+#sysline { color: #ffb020; text-style: bold; }
+#sysinfo { color: #2a8fb0; }
+
+OptionList {
+    background: black;
+    color: #4fd8ff;
+    border: solid #2a8fb0;
+    height: auto;
+    max-height: 12;
+    margin: 0 2;
+}
+OptionList > .option-list--option-highlighted {
+    background: #2a8fb0;
+    color: black;
+    text-style: bold;
+    transition: background 200ms in_out_cubic;
+}
+
+#detail { color: #ff4136; text-style: bold; padding: 1 2; min-height: 8; }
+
+Footer { background: black; color: #2a8fb0; }

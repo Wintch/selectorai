@@ -1,0 +1,35 @@
+/* "mother" — green phosphor CRT monochrome. Reference: MU-TH-UR-style
+   Weyland-Yutani computer HUD (rounded boxed panels, green vector lines
+   on black, filled highlight on the active field). Default theme. */
+
+Screen { background: black; color: #33ff66; }
+
+#title { color: #33ff66; text-style: bold; padding: 1 0 0 2; }
+
+#sysbox {
+    border: round #1f9945;
+    margin: 0 2 1 2;
+    padding: 0 1;
+    height: auto;
+}
+#sysline { color: #1f9945; text-style: bold; }
+#sysinfo { color: #1f9945; }
+
+OptionList {
+    background: black;
+    color: #33ff66;
+    border: round #1f9945;
+    height: auto;
+    max-height: 12;
+    margin: 0 2;
+}
+OptionList > .option-list--option-highlighted {
+    background: #1f9945;
+    color: black;
+    text-style: bold;
+    transition: background 200ms in_out_cubic;
+}
+
+#detail { color: #33ff66; text-style: bold; padding: 1 2; min-height: 8; }
+
+Footer { background: black; color: #1f9945; }

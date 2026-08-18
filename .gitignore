@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+
+# Personal background notes (unverified, contains a referral link) — not for publication
+guia-ai-limites-instalacion.md
+
+# Local scratch
+*.log
+.DS_Store
