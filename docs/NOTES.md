@@ -310,6 +310,16 @@ practical workaround already implemented (real error → saved exact reset
 date) requires having actually launched Codex through this script at least
 once while limited.
 
+**This is purely a display limitation, not a launch/auth problem** — worth
+spelling out because it reads as broken otherwise: `no usage % available
+via non-interactive CLI` next to Codex just means selectorai has no way to
+show you a number, nothing about whether Codex itself works. Launching
+Codex through the picker is completely unaffected either way, same as it
+always was. Codex still correctly shows ONLINE (see `classify()` in
+`sai/health.py` — `kind: "no-usage-api"` maps to ONLINE with no reason,
+same bucket as "not-checked", because *unknown* isn't the same thing as
+*unhealthy*).
+
 ## Service status — a real outage marks a provider offline too
 
 Quota/`% used` (above) is per-account and asks the provider's own CLI.
