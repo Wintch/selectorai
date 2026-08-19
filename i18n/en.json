@@ -54,6 +54,7 @@
   "note_antigravity_skipped": "not checked (pass --check-antigravity to probe; only do this after 'agy' has logged in once — otherwise it opens a Google OAuth browser popup)",
   "note_grok_skipped": "not checked (pass --check-grok to probe; opens a real interactive grok session in a throwaway tmux window to read its Usage limit tab, since that data doesn't exist headlessly — see docs/NOTES.md)",
   "note_grok_no_usage": "no usage % available — the live tmux probe didn't find the Usage limit tab (grok's session may not have started in time, or its popup layout changed; not necessarily an auth problem)",
+  "grok_experimental_caveat": "⚠ experimental — treat this bar as \"some signal\", not a reliable countdown: confirmed live that a free account got cut off entirely while this same reading still said 0% used, so the number above and whatever actually stops you don't appear to track the same thing",
   "note_no_status_configured": "no status check configured",
   "menu_available": "Available:",
   "menu_pick_prompt": "Pick [1-{n}] (Enter = first): ",

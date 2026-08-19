@@ -54,6 +54,7 @@
   "note_antigravity_skipped": "no chequeado (pasá --check-antigravity para probar; hacelo solo después de que 'agy' ya inició sesión una vez — si no, abre un popup de login de Google)",
   "note_grok_skipped": "no chequeado (pasá --check-grok para probar; abre una sesión real de grok en una ventana tmux descartable para leer su solapa Usage limit, ya que ese dato no existe en modo headless — ver docs/NOTES.md)",
   "note_grok_no_usage": "no hay % de uso disponible — el chequeo en vivo por tmux no encontró la solapa Usage limit (puede que la sesión de grok no haya arrancado a tiempo, o que su layout haya cambiado; no necesariamente un problema de login)",
+  "grok_experimental_caveat": "⚠ experimental — tratá esta barra como \"alguna señal\", no como una cuenta regresiva confiable: confirmado en vivo que una cuenta gratuita se quedó sin acceso mientras esta misma lectura seguía marcando 0% usado, así que el número de arriba y lo que realmente te corta el acceso no parecen ser la misma cosa",
   "note_no_status_configured": "no hay chequeo de estado configurado",
   "menu_available": "Disponibles:",
   "menu_pick_prompt": "Elegí [1-{n}] (Enter = el primero): ",

@@ -1,12 +1,19 @@
 # selectorai
 
-Rotate between your AI coding CLIs' free quotas from one retro terminal
-picker — built for the start of an SSH session.
+Rotate between your AI coding CLIs from one retro terminal picker — built
+for the start of an SSH session.
 
 selectorai installs, updates, and picks between Claude Code, Codex CLI,
 Antigravity, and Grok Build: shows quota and last-use for each, probes
 whether the provider's own service is actually up, and launches whichever
-one you pick with a fixed, predictable set of flags.
+one you pick with a fixed, predictable set of flags. Provider-agnostic on
+purpose — this isn't a free-tier-only tool (Claude Code here is typically
+a paid subscription, for one); the point is a fast fallback between
+*whichever* CLIs you actually have, free or paid, so one being tapped out
+or down never blocks you. See [What quota visibility each provider really
+has](#what-quota-visibility-each-provider-really-has) below for exactly
+what each one's numbers do and don't mean, including a couple of real
+caveats worth reading before you trust them blindly.
 
 ![selectorai picker screenshot](docs/screenshot.svg)
 
@@ -25,7 +32,7 @@ one you pick with a fixed, predictable set of flags.
 - **Background tmux sessions + reattach** — launches persist through an
   SSH drop or a closed laptop lid, with a "reattach" offer and an output
   peek the next time you open the picker.
-- **Guided setup** (`setup`) — a nine-step walkthrough (language,
+- **Guided setup** (`setup`) — a ten-step walkthrough (language,
   providers, auth, theme, and more) that only ever runs the real
   subcommands it's offering, never a separate implementation.
 - **Clean-URL auth flows** — every provider's login goes through the same
@@ -56,7 +63,7 @@ only, feature-frozen).
 | **Claude Code** | ✅ Live, always | The only CLI with a confirmed working non-interactive usage query (`claude -p "/usage"`) — no gating needed. |
 | **Codex CLI** | ⚠️ Reactive only | No non-interactive usage command exists anywhere in `codex --help`/`doctor`/`login status` — quota is only known after you actually hit a rate limit through this script, from the error message it prints. |
 | **Antigravity** | ✅ Live, opt-in | `agy -p "/usage"` works, but an unauthenticated call can pop a real Google OAuth browser window — gated behind `--check-antigravity` for that reason. |
-| **Grok Build** | ✅ Live, opt-in | The "Usage limit" tab of grok's own `/info` popup has it, but only as an interactive TUI panel — no headless flag or JSON field exposes it. Gated behind `--check-antigravity`'s sibling flag, `--check-grok`, which opens a real `grok` session in a throwaway tmux window to read that panel. |
+| **Grok Build** | ⚠️ Live, opt-in, **experimental** | The "Usage limit" tab of grok's own `/info` popup has it, but only as an interactive TUI panel — no headless flag or JSON field exposes it. Gated behind `--check-antigravity`'s sibling flag, `--check-grok`, which opens a real `grok` session in a throwaway tmux window to read that panel. **Don't trust the % blindly**: on a free account this bar showed `0% used` right up until a real session got cut off entirely — the visible weekly bar and whatever undocumented limit actually stops you don't appear to be the same thing. Treat it as "some signal", not a reliable countdown, same spirit as Codex's reactive-only check below. |
 
 Full sourcing, confirmation steps, and the incidents behind each of these
 is in [`docs/NOTES.md`](docs/NOTES.md#what-status-actually-means-per-provider).

@@ -8,6 +8,14 @@ tmux window just to read one screen, which is slow (~5-20s) and coupled
 to grok's current TUI layout in a way a flag or JSON endpoint wouldn't be.
 See _live_usage_limit() below for what's confirmed and why headless mode
 can't do this instead.
+
+EXPERIMENTAL, separately from the above: confirmed live (see docs/NOTES.md's
+"Marked experimental" section) that the "Weekly limit" bar this scrapes
+doesn't reliably predict the real cutoff — a free account got cut off
+entirely while this same reading still said 0% used. status() always
+appends a caveat row (see sai/providers/base.py's render_status_rows,
+p == "grok" branch) when real numbers come back, not just on a failed
+probe, since the risk is specifically in a number that looks fine.
 """
 import os
 import re

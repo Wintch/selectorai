@@ -206,6 +206,29 @@ Python anyway. Since `.py` became the primary version, `.sh` stays a
 plain-English, genuinely dependency-free fallback (its numbered menu) rather
 than carrying any of this too.
 
+### Fixed bug: switching `--lang` mid-cache showed mixed-language reset text
+
+`sai.cache.fetch_all_statuses`'s cached `status` dicts aren't raw data —
+`rows`' reset field already has `t("countdown_dh"/"countdown_hm"/
+"countdown_m", ...)` baked in by `sai.timeutil._format_countdown` at fetch
+time, and gated providers' `note` field is similarly pre-rendered. Live-
+reproduced: `./selectorai.py --lang ru status` (writes the cache in
+Russian) immediately followed by `./selectorai.py --lang en status` (still
+within the TTL, no `--refresh`) showed English labels with a Russian
+`сброс через 2д 22ч` countdown still glued onto Grok's and Antigravity's
+reset text — the cache entry was reused as-is because it was still fresh
+by *time*, with no check for which language it was rendered in.
+
+Fixed the same way the gated-provider toggle mismatch (`_CHECK_GATED_PROVIDERS`,
+above) already got handled rather than reworking the cache to store raw
+data and render at display time (a much bigger change to every provider's
+status() contract): each cache entry now also records `"lang"` at write
+time, and a read compares it against the current `get_lang()` — a mismatch
+forces a live re-fetch regardless of the TTL, same as a stale `kind` does
+for Antigravity/Grok's opt-in gate. Entries written before this field
+existed have `entry.get("lang") is None`, never equal to a real lang code,
+so they self-heal into the new shape on next write, no migration needed.
+
 ## Reset times: countdown, not just a date
 
 Every reset time — Claude's session/weekly/Fable, Codex's rate-limit,
@@ -269,7 +292,7 @@ remote-from-`<ip>`) and calls out other usernames or remote IPs explicitly.
 | **Claude Code** | ✅ real, live | `claude -p "/usage"` — this is the only CLI with a working non-interactive usage query confirmed without any extra gating | Exact reset time per bucket (session 5h, weekly, weekly-Fable) |
 | **Codex CLI** | ⚠️ only after a failure | No non-interactive command exists (confirmed: not in `codex --help`, not in `codex login status`, not in `codex doctor`; the real data lives behind an internal `account/rateLimits/read` JSON-RPC method used only by the TUI's `app-server`, not worth reverse-engineering for this) | Only known once you actually hit the limit through this script — Codex's own error message includes the exact reset date/time, which gets saved and reused until it passes |
 | **Antigravity (`agy`)** | ✅ confirmed live, and opt-in | `agy -p "/usage"`, gated behind `--check-antigravity`. Format confirmed against a real logged-in account (see below) — but the CLI can still trigger a fresh OAuth popup even after a prior successful login, due to upstream session bugs | Exact ISO timestamp per bucket, reformatted to local time |
-| **Grok Build (xAI)** | ✅ confirmed live, and opt-in | A tmux-driven scrape of `/info`'s "Usage limit" popup tab, gated behind `--check-grok` — see [below](#groks---check-grok--live-but-via-a-tmux-driven-tui-scrape-not-a-flag) for the full mechanism and why there's no flag or JSON field to poll instead | "Resets: <Month Day, HH:MM>" text, parsed the same way Claude/Codex's human-readable reset strings are (`sai.timeutil._parse_reset_epoch`) |
+| **Grok Build (xAI)** | ⚠️ confirmed live, opt-in, **experimental** | A tmux-driven scrape of `/info`'s "Usage limit" popup tab, gated behind `--check-grok` — see [below](#groks---check-grok--live-but-via-a-tmux-driven-tui-scrape-not-a-flag) for the full mechanism and why there's no flag or JSON field to poll instead. Confirmed live this bar doesn't reliably predict the real cutoff (see the "Marked experimental" subsection below) — shown with a permanent caveat line, not treated as trustworthy the way the other three are | "Resets: <Month Day, HH:MM>" text, parsed the same way Claude/Codex's human-readable reset strings are (`sai.timeutil._parse_reset_epoch`) |
 
 Grok is a genuinely different case from the other three — not "no data",
 but "the data only exists inside a pager-only TUI panel, never headlessly".
@@ -686,6 +709,31 @@ finds "Weekly limit") reports `kind: "no-usage-api"`, not `"auth-needed"` —
 unlike Antigravity's empty-rows case (confirmed to specifically mean
 sign-in-needed), a failed Grok probe just as easily means a slow tmux
 session or a future popup-layout change, not a login problem.
+
+### Marked experimental: the "Weekly limit" bar doesn't predict the real cutoff
+
+Confirmed live, same free account, the day after the mechanism above
+shipped: a real session got cut off entirely — the same undocumented
+free-tier limit the original (pre-tmux-scrape) research already
+documented (see the earlier "confirmed live... no reset time given
+anywhere" finding above) — while `/info`'s "Weekly limit (Free)" bar,
+read moments before, still read `0% used`. So there are apparently **two
+separate limits**: the "Weekly limit" this script now reads, and whatever
+actually cuts a free account off, and they don't appear to track the same
+thing. Whether "Weekly limit" tracks a different (looser) quota, only
+updates on some delay, or is cosmetic and not wired to the real enforcement
+at all isn't confirmed — just that trusting it as "0% used, therefore
+plenty of room" was wrong in practice.
+
+Because of this, `sai/providers/base.py`'s `render_status_rows()` appends
+a fixed caveat line (`grok_experimental_caveat` i18n key) under Grok's row
+every time real numbers come back — not just on a skipped/failed probe,
+since the risk here is specifically in trusting a number that *looks*
+fine. `sai/ui/plain.py`'s fallback menu (which renders via
+`provider_summary()`, a different code path) carries its own copy of the
+same line for the same reason. README's provider table also marks Grok
+`⚠ … experimental` rather than a clean `✅`, unlike Antigravity's live
+check, which has never shown this kind of numbers-vs-reality mismatch.
 
 **Also confirmed live, same account:** only `Grok 4.6` was available to
 pick from — likely another free-tier restriction (newer/other models gated

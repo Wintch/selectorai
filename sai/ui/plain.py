@@ -41,6 +41,13 @@ def _print_rows(provider_ids, statuses, classified, menu_provider, start):
         models_line = models.models_line(p)
         if models_line:
             print(f"       {models_line}")
+        if p == "grok" and status["rows"]:
+            # Same caveat sai/providers/base.py's render_status_rows()
+            # attaches for the Textual detail panel and `status` command —
+            # this is the plain-menu's own render path (provider_summary()
+            # above, not render_status_rows), so it needs its own copy of
+            # the same warning rather than inheriting it for free.
+            print(f"       {t('grok_experimental_caveat')}")
         menu_provider[i] = p
         i += 1
     return i

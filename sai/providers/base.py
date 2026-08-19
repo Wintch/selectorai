@@ -122,6 +122,16 @@ def render_status_rows(p, status):
     for label, used, reset in status["rows"]:
         left = 100 - used
         lines.append(t("status_row", label=label, used=used, left=left, reset=reset))
+    if p == "grok":
+        # Real numbers came back (this branch only runs when status["rows"]
+        # is non-empty), but confirmed live that the bar itself isn't
+        # trustworthy: a free account got cut off entirely while this same
+        # "Weekly limit (Free)" reading still said 0% used — whatever
+        # undocumented limit actually stops you doesn't appear to be the
+        # same thing this popup tab tracks. Always shown, not just on a
+        # skipped/failed probe, since the risk is specifically in trusting
+        # a number that LOOKS fine.
+        lines.append(f"  {t('grok_experimental_caveat')}")
     return lines
 
 

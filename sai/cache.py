@@ -9,7 +9,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from sai import health, providers
-from sai.i18n import t
+from sai.i18n import get_lang, t
 from sai.paths import CACHE_FILE
 from sai.providers import antigravity, grok
 
@@ -152,12 +152,19 @@ def fetch_all_statuses(provider_list, force_refresh=False, show_progress=True):
     statuses = {}
     to_query = []
 
+    lang = get_lang()
     for p in provider_list:
         if not force_refresh and p in cached_map:
             entry = cached_map[p]
             ts = entry.get("timestamp", 0)
             st = entry.get("status")
-            if now - ts < _cache_ttl(p) and st is not None:
+            # entry.get("lang") is None for any entry written before this
+            # field existed — never equal to a real lang code, so those
+            # entries count as a mismatch and get refetched once, same
+            # self-healing shape as the `kind`-missing case in the gated-
+            # provider check below, not a migration that needs writing.
+            lang_matches = entry.get("lang") == lang
+            if now - ts < _cache_ttl(p) and st is not None and lang_matches:
                 if p in _CHECK_GATED_PROVIDERS:
                     # Compare the structured `kind` field, not the
                     # rendered `note` string (which is localized and
@@ -200,7 +207,13 @@ def fetch_all_statuses(provider_list, force_refresh=False, show_progress=True):
             except Exception as e:
                 st = {"pct_used": None, "rows": [], "note": str(e), "kind": "no-usage-api"}
             statuses[p] = st
-            section[p] = {"timestamp": int(now), "status": st}
+            # "lang" records which language's t() calls are baked into
+            # st's rendered text (reset countdowns via
+            # sai.timeutil._format_countdown, gated-provider notes) — read
+            # back above to invalidate a cache entry written under a
+            # different language instead of showing stale mixed-language
+            # text after a `lang`/`--lang` switch.
+            section[p] = {"timestamp": int(now), "status": st, "lang": lang}
             if progress:
                 progress.update(1, text=t("progress_checking", provider=providers.label(p)))
 
