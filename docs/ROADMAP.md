@@ -36,11 +36,14 @@ quota query if one exists; documentation confidence).
   Linux binary, unlike selectorai's other four providers — worth noting
   in the install step's UX).
 - **Open gaps before shipping**: no confirmed non-interactive usage query
-  (same shape as Codex/Grok today — `/stats model` is TUI-only and
-  reportedly unreliable per community bug reports); exact resume/
-  checkpoint CLI syntax unverified. Both are exactly the kind of gap
-  `docs/ADDING_PROVIDERS.md`'s process is built to catch before code is
-  written, not after.
+  (same shape as Codex today — `/stats model` is TUI-only and reportedly
+  unreliable per community bug reports; Grok was in this same shape until
+  a tmux-driven TUI scrape turned out to be viable for it — see
+  [`docs/NOTES.md`](NOTES.md#groks---check-grok--live-but-via-a-tmux-driven-tui-scrape-not-a-flag)
+  — worth checking whether the same approach applies here before assuming
+  it doesn't); exact resume/checkpoint CLI syntax unverified. Both are
+  exactly the kind of gap `docs/ADDING_PROVIDERS.md`'s process is built to
+  catch before code is written, not after.
 
 ### 2. iFlow CLI
 

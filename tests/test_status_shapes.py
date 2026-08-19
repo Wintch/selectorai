@@ -125,12 +125,97 @@ def test_antigravity_no_usage(monkeypatch_run):
     check("antigravity no-usage: kind == auth-needed", st["kind"] == "auth-needed")
 
 
-def test_grok_always_no_usage_api():
+def test_grok_not_checked():
+    grok.set_check_enabled(False)
     st = grok.status()
-    assert_status_shape("grok", st)
-    check("grok: kind == no-usage-api", st["kind"] == "no-usage-api")
-    check("grok: pct_used is None", st["pct_used"] is None)
-    check("grok: no rows", st["rows"] == [])
+    assert_status_shape("grok not-checked", st)
+    check("grok not-checked: kind == not-checked", st["kind"] == "not-checked")
+    check("grok not-checked: pct_used is None", st["pct_used"] is None)
+
+
+# Fake tmux pane text, same shape confirmed live 2026-08-18 (Grok Build
+# 1.0.5, free grok.com account) via `/info` + Tab + Tab inside a real
+# tmux session — see sai/providers/grok.py's _live_usage_limit()
+# docstring. The "│ ❯" substring is the ready-prompt marker
+# _live_usage_limit polls for; "Weekly limit"/"%"/"Resets:" are what it
+# regex-searches for once ready.
+_GROK_PANE_WITH_USAGE = (
+    "  │  Weekly limit (Free)                        │\n"
+    "  │  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  37%          │\n"
+    "  │  Resets: August 21, 21:00                    │\n"
+    "  │ ❯                                             │\n"
+)
+_GROK_PANE_NO_USAGE = "  │ ❯                                             │\n"
+
+
+def test_grok_ok(monkeypatch_run):
+    session_name = grok._PROBE_SESSION
+    monkeypatch_run({
+        ("tmux", "kill-session", "-t", session_name): "",
+        ("tmux", "new-session", "-d", "-s", session_name, "-x", "200", "-y", "50", "grok"): "",
+        ("tmux", "capture-pane", "-t", session_name, "-p"): _GROK_PANE_WITH_USAGE,
+        ("tmux", "send-keys", "-t", session_name, "/info"): "",
+        ("tmux", "send-keys", "-t", session_name, "Enter"): "",
+        ("tmux", "send-keys", "-t", session_name, "Escape"): "",
+    })
+    orig_available = grok.session.available
+    orig_sleep = grok.time.sleep
+    grok.session.available = lambda: True
+    grok.time.sleep = lambda s: None  # this test's pane is "ready" from the first capture, so nothing waits on real time
+    grok.set_check_enabled(True)
+    try:
+        st = grok.status()
+    finally:
+        grok.session.available = orig_available
+        grok.time.sleep = orig_sleep
+        grok.set_check_enabled(False)
+    assert_status_shape("grok ok", st)
+    check("grok ok: kind == ok", st["kind"] == "ok")
+    check("grok ok: pct_used == 37", st["pct_used"] == 37)
+    check("grok ok: 1 row", len(st["rows"]) == 1)
+    check("grok ok: row label is grok's own text", st["rows"][0][0] == "Weekly limit (Free)")
+    check("grok ok: reset text includes grok's own date", "August 21, 21:00" in st["rows"][0][2])
+
+
+def test_grok_no_usage(monkeypatch_run):
+    session_name = grok._PROBE_SESSION
+    monkeypatch_run({
+        ("tmux", "kill-session", "-t", session_name): "",
+        ("tmux", "new-session", "-d", "-s", session_name, "-x", "200", "-y", "50", "grok"): "",
+        ("tmux", "capture-pane", "-t", session_name, "-p"): _GROK_PANE_NO_USAGE,
+        ("tmux", "send-keys", "-t", session_name, "/info"): "",
+        ("tmux", "send-keys", "-t", session_name, "Enter"): "",
+        ("tmux", "send-keys", "-t", session_name, "Tab"): "",
+        ("tmux", "send-keys", "-t", session_name, "Escape"): "",
+    })
+    orig_available = grok.session.available
+    orig_sleep = grok.time.sleep
+    grok.session.available = lambda: True
+    grok.time.sleep = lambda s: None
+    grok.set_check_enabled(True)
+    try:
+        st = grok.status()
+    finally:
+        grok.session.available = orig_available
+        grok.time.sleep = orig_sleep
+        grok.set_check_enabled(False)
+    assert_status_shape("grok no-usage", st)
+    check("grok no-usage: kind == no-usage-api", st["kind"] == "no-usage-api")
+    check("grok no-usage: pct_used is None", st["pct_used"] is None)
+    check("grok no-usage: no rows", st["rows"] == [])
+
+
+def test_grok_tmux_missing():
+    orig_available = grok.session.available
+    grok.session.available = lambda: False
+    grok.set_check_enabled(True)
+    try:
+        st = grok.status()
+    finally:
+        grok.session.available = orig_available
+        grok.set_check_enabled(False)
+    assert_status_shape("grok no-tmux", st)
+    check("grok no-tmux: kind == no-usage-api", st["kind"] == "no-usage-api")
 
 
 def test_codex_no_saved_state():
@@ -214,14 +299,18 @@ def main():
         test_claude_ok(install_canned)
         test_claude_login_expired(install_canned)
         test_antigravity_ok(install_canned)
-        test_grok_always_no_usage_api()  # doesn't call subprocess at all
         test_antigravity_no_usage(install_canned)
+        test_grok_ok(install_canned)
+        test_grok_no_usage(install_canned)
     finally:
         subprocess.run = orig_run
 
-    # These don't need the fake at all (antigravity gate off never calls
-    # subprocess; codex reads only from disk state).
+    # These don't need the fake at all (antigravity/grok gate off never
+    # calls subprocess; grok tmux-missing short-circuits before any
+    # subprocess call; codex reads only from disk state).
     test_antigravity_not_checked()
+    test_grok_not_checked()
+    test_grok_tmux_missing()
     test_codex_no_saved_state()
     test_codex_cached_ratelimit_active()
     test_codex_cached_ratelimit_expired_self_clears()

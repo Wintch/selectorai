@@ -31,7 +31,7 @@ provider's own shipped docs) or explicitly marked **unverified**/
 - [Used % vs. left %](#used--vs-left---always-shown-together)
 - [Install methods](#install-methods-all-verified-no-sudo-required)
 - [Antigravity's OAuth-popup incident (`--check-antigravity`)](#antigravitys-live-usage-check-is-opt-in---check-antigravity)
-- [Grok free-tier findings](#grok-has-no---check-grok--confirmed-not-just-untested)
+- [Grok's `--check-grok` — tmux-driven TUI scrape](#groks---check-grok--live-but-via-a-tmux-driven-tui-scrape-not-a-flag)
 - [Antigravity auth over SSH / Error 400](#antigravity-auth-over-ssh--remote-console)
 - [Known limitations](#known-limitations)
 - [Next / open items](#next--open-items)
@@ -269,38 +269,15 @@ remote-from-`<ip>`) and calls out other usernames or remote IPs explicitly.
 | **Claude Code** | ✅ real, live | `claude -p "/usage"` — this is the only CLI with a working non-interactive usage query confirmed without any extra gating | Exact reset time per bucket (session 5h, weekly, weekly-Fable) |
 | **Codex CLI** | ⚠️ only after a failure | No non-interactive command exists (confirmed: not in `codex --help`, not in `codex login status`, not in `codex doctor`; the real data lives behind an internal `account/rateLimits/read` JSON-RPC method used only by the TUI's `app-server`, not worth reverse-engineering for this) | Only known once you actually hit the limit through this script — Codex's own error message includes the exact reset date/time, which gets saved and reused until it passes |
 | **Antigravity (`agy`)** | ✅ confirmed live, and opt-in | `agy -p "/usage"`, gated behind `--check-antigravity`. Format confirmed against a real logged-in account (see below) — but the CLI can still trigger a fresh OAuth popup even after a prior successful login, due to upstream session bugs | Exact ISO timestamp per bucket, reformatted to local time |
-| **Grok Build (xAI)** | 🚫 not possible at all, confirmed | None — see below | n/a, no reset time is ever given |
+| **Grok Build (xAI)** | ✅ confirmed live, and opt-in | A tmux-driven scrape of `/info`'s "Usage limit" popup tab, gated behind `--check-grok` — see [below](#groks---check-grok--live-but-via-a-tmux-driven-tui-scrape-not-a-flag) for the full mechanism and why there's no flag or JSON field to poll instead | "Resets: <Month Day, HH:MM>" text, parsed the same way Claude/Codex's human-readable reset strings are (`sai.timeutil._parse_reset_epoch`) |
 
-Grok is a genuinely different case from the other three — and the
-confirmation happened in two layers, not one:
-
-1. **Structural, from Grok's own shipped docs** at `~/.grok/docs/user-guide/`:
-   `/usage` (alias `/cost`, "View credit usage or manage billing") is real,
-   but it's a **TUI-only** slash command. `14-headless-mode.md` documents
-   `-p` as sending its argument straight to the model as a chat prompt —
-   headless mode does not interpret slash commands at all, and there's no
-   CLI subcommand for this either (checked the full `grok --help` command
-   list). Billing is credit/USD-based (`total_cost_usd` per request, per
-   the headless JSON output schema), not a session/weekly quota percentage
-   like the other three, so there's nothing here that maps onto this
-   script's "% used" model even in principle. This alone rules out ever
-   checking headlessly, on any account type.
-2. **Confirmed live, on an actual free account** (grok.com login, no API
-   key/billing): `/usage` and `/cost` inside the real interactive `grok`
-   TUI show *nothing* — no credit balance exists to check at all for this
-   account type. The server just cuts you off past some undocumented
-   limit and pushes an upgrade prompt; no reset time is given anywhere,
-   in the CLI or its docs. So it's not only headless mode that comes up
-   empty — the one interactive path that theoretically has this data has
-   nothing to show either, at least below a paid plan.
-
-`sai/providers/grok.py`'s `status()` doesn't attempt a live check at all —
-running `grok -p "/usage"` wouldn't just fail to parse, it would spend real
-tokens/credits asking the model to interpret the literal text "/usage" as
-a prompt, for nothing. On a free account there is currently no way to see
-Grok usage/cost, from this script or otherwise — try `/usage` inside
-`grok` yourself if you're on a paid plan, or check
-[console.x.ai](https://console.x.ai).
+Grok is a genuinely different case from the other three — not "no data",
+but "the data only exists inside a pager-only TUI panel, never headlessly".
+Full mechanism, the headless-mode findings that rule out a simpler
+approach, and the two-layer live confirmation behind this are in
+["Grok's `--check-grok`"](#groks---check-grok--live-but-via-a-tmux-driven-tui-scrape-not-a-flag)
+further down this file — kept there rather than duplicated here since it's
+long enough to want its own section.
 
 **Why Codex can't just be polled like Claude:** there is no `codex usage`,
 no flag, nothing under `codex --help`. `codex doctor` and `codex login
@@ -636,26 +613,79 @@ time for display. The overall `pct_used` shown in the summary line is the
 *most* constrained bucket (highest % used) — same "worst case wins"
 convention as Claude's session-vs-weekly comparison.
 
-## Grok has no `--check-grok` — confirmed, not just untested
+## Grok's `--check-grok` — live, but via a tmux-driven TUI scrape, not a flag
 
-An earlier version of this script gated a hypothetical `grok -p "/usage"`
-probe behind `--check-grok`/`check-grok on`, as a precaution mirroring
-Antigravity's OAuth-popup gate — modeled on Grok's CLI sharing enough shape
-with Claude/Antigravity's (`--permission-mode`, `-c/--continue`, same
-`login --device-auth` pattern) that the same risk seemed plausible.
+An earlier version of this script concluded Grok had no usage check to gate
+at all — confirmed at the time (Grok Build ~1.0.4) that `/usage`/`/cost`
+were TUI-only per Grok's own shipped docs, headless mode didn't interpret
+slash commands, and a free account's `/usage` inside the real TUI showed
+nothing (no credit balance to check). That finding was real for that
+version, but it's now **superseded**: re-verified live 2026-08-18 against
+Grok Build 1.0.5 on the same free grok.com account, and the picture changed
+in two ways.
 
-That flag is gone now, not just turned off — reading Grok's own shipped
-docs (`~/.grok/docs/user-guide/`, see the status table above) confirmed
-there's no live check to gate in the first place: `/usage` is real but
-TUI-only, headless mode doesn't interpret slash commands at all, and Grok's
-billing is credit-based rather than the session/weekly-quota-percentage
-model this script's `--check-*` flags exist to poll. Keeping a flag that
-toggles nothing would just be confusing. If a future Grok release adds a
-real non-interactive usage query, this is the place to wire it back in.
+1. **Headless mode now intercepts *some* slash commands.**
+   `grok -p "/info" --output-format json` (alias `/status`, `/session-info`)
+   returns real structured JSON instead of sending the literal text to the
+   model — confirmed live:
+   ```json
+   {"text": "**Session ID:** ...\n**Model:** grok-4.6\n**Turn:** 0\n**Context:** 3994 / 500000 tokens (1%)", ...}
+   ```
+   `/usage`/`/cost` are still *not* intercepted headlessly, though — sent as
+   a literal chat prompt, the model tries to research an answer instead
+   ("I'll look up how `/usage` is handled here...") rather than the CLI
+   returning real data. So headless mode grew a real command, just not the
+   billing one.
 
-(Full detail on the free-account confirmation is in the status table
-section above — the short version: neither `/usage` nor `/cost` show
-anything there either, so this isn't only a headless-mode gap.)
+2. **The actual quota data exists now, but only in a pager-only UI panel.**
+   The same `/info` command, run for real inside the interactive TUI (not
+   headless), opens a popup with three tabs — `Context usage`, `Usage
+   limit`, `Session info` — and the middle one has exactly what was missing
+   before:
+   ```
+   Weekly limit (Free)
+   ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  0%
+   Resets: August 21, 21:00
+   ```
+   Confirmed this is genuinely headless-inaccessible, not just unexplored:
+   the same `-p "/info" --output-format json` call above never includes it
+   — that JSON only ever carries session/context fields, regardless of
+   which of `/info`'s three tabs a real interactive render would default
+   to. The popup's other two tabs (`Context usage`/`Session info`) are
+   reachable the same headless way `/info`'s default text already covers;
+   `Usage limit` specifically has no non-interactive path at all.
+
+So there's no flag or JSON field to poll — the only way to reach "Resets:
+<date>" is to actually run the TUI and read the screen. `--check-grok` /
+`check-grok on` (`sai.providers.grok.status()` → `_live_usage_limit()`)
+does exactly that, opening a real `grok` session inside a **throwaway tmux
+window** (session name `selectorai-grok-probe`, killed at the end either
+way):
+
+1. `tmux new-session -d` a plain `grok` invocation, poll `capture-pane -p`
+   for the input prompt border (`│ ❯`) as the ready signal — observed
+   between 1s (warm) and ~15-20s (cold/slow network) on this machine.
+2. `send-keys "/info"` + `Enter`, wait ~2s for the popup to render.
+3. `send-keys "Tab"` up to 3 times, checking the captured pane for "Weekly
+   limit" after each — confirmed live that `/info` lands on "Session info"
+   first and Tab cycles to "Context usage" then "Usage limit", but the code
+   doesn't hardcode that order, just stops as soon as the text shows up.
+4. Regex out the label ("Weekly limit (Free)" verbatim — a paid tier
+   presumably reads "(Plus)"/"(Heavy)", never observed live so not assumed),
+   the percentage, and the "Resets: ..." text.
+5. `Escape` then `kill-session`, always, via `finally`.
+
+This is a materially different risk profile than Antigravity's gate — no
+OAuth-popup risk, since a free grok.com login doesn't re-prompt mid-session
+the way Antigravity's flaky session handling does — but it IS slower (a
+real TUI boot every time, not one subprocess call) and coupled to grok's
+current popup layout in a way a flag or JSON endpoint wouldn't be, which is
+why it's opt-in via the same `--check-*`/`check-* on` shape rather than
+default-on. A failed probe (session never ready, or the Tab-cycle never
+finds "Weekly limit") reports `kind: "no-usage-api"`, not `"auth-needed"` —
+unlike Antigravity's empty-rows case (confirmed to specifically mean
+sign-in-needed), a failed Grok probe just as easily means a slow tmux
+session or a future popup-layout change, not a login problem.
 
 **Also confirmed live, same account:** only `Grok 4.6` was available to
 pick from — likely another free-tier restriction (newer/other models gated

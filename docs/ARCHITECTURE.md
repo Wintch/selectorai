@@ -77,8 +77,13 @@ ORDER. Nothing else changes.
 1. **Never probe a provider CLI speculatively.** An unauthenticated
    `agy -p ...` opens a real Google OAuth browser popup; the same class of
    risk applies to any CLI whose auth behavior you haven't confirmed. Live
-   status probes are opt-in (`--check-antigravity`) and cached with long
-   backoff TTLs precisely because of this.
+   status probes are opt-in (`--check-antigravity`, `--check-grok`) and
+   cached with long backoff TTLs precisely because of this — Grok's isn't
+   an OAuth risk specifically, but it does drive a real interactive TUI in
+   a throwaway tmux session (see `sai/providers/grok.py`'s
+   `_live_usage_limit()`), which is exactly the kind of thing this rule
+   means by "never speculatively": never do it from status/menu code
+   without an explicit opt-in.
 2. **Never mutate shared terminal state** (`stty`, escape codes that
    persist). A full-screen TUI launched afterwards reads that state and
    there is no way to hand control back to fix it. Textual owns the

@@ -51,13 +51,15 @@ def _raising_input(prompt=""):
 # whose mtime-or-absence this test snapshots before and after, as the final
 # proof --dry-run left them alone — independent of STATE_DIR being pointed
 # at a tempdir below, since a couple of sai.paths constants (LANG_FILE,
-# CHECK_ANTIGRAVITY_FILE) are computed once at import time from the *real*
-# STATE_DIR and wouldn't move just because a test later monkeypatches
-# sai.paths.STATE_DIR — see sai/installer.py's antigravity-file comment.
+# CHECK_ANTIGRAVITY_FILE, CHECK_GROK_FILE) are computed once at import time
+# from the *real* STATE_DIR and wouldn't move just because a test later
+# monkeypatches sai.paths.STATE_DIR — see sai/installer.py's
+# antigravity-file/grok-file comments.
 _REAL_PREF_FILES = [
     Path.home() / ".selectorai" / "lang",
     Path.home() / ".selectorai" / "theme",
     Path.home() / ".selectorai" / "check_antigravity",
+    Path.home() / ".selectorai" / "check_grok",
     Path.home() / ".selectorai" / "background",
 ]
 

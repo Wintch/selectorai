@@ -56,7 +56,7 @@ only, feature-frozen).
 | **Claude Code** | ✅ Live, always | The only CLI with a confirmed working non-interactive usage query (`claude -p "/usage"`) — no gating needed. |
 | **Codex CLI** | ⚠️ Reactive only | No non-interactive usage command exists anywhere in `codex --help`/`doctor`/`login status` — quota is only known after you actually hit a rate limit through this script, from the error message it prints. |
 | **Antigravity** | ✅ Live, opt-in | `agy -p "/usage"` works, but an unauthenticated call can pop a real Google OAuth browser window — gated behind `--check-antigravity` for that reason. |
-| **Grok Build** | 🚫 Not possible | `/usage` is real but TUI-only per Grok's own docs, and free-tier accounts have no credit balance to check even inside that TUI. |
+| **Grok Build** | ✅ Live, opt-in | The "Usage limit" tab of grok's own `/info` popup has it, but only as an interactive TUI panel — no headless flag or JSON field exposes it. Gated behind `--check-antigravity`'s sibling flag, `--check-grok`, which opens a real `grok` session in a throwaway tmux window to read that panel. |
 
 Full sourcing, confirmation steps, and the incidents behind each of these
 is in [`docs/NOTES.md`](docs/NOTES.md#what-status-actually-means-per-provider).
@@ -75,6 +75,7 @@ checked against that code, not written from memory.
 | `./selectorai.py status [--who]` | Machine status + quota/reset info per provider. `--who` adds who else is logged in (opt-in). |
 | `./selectorai.py auth [provider...]` | Log into every installed provider (or the ones named) with the clean-URL flow. |
 | `./selectorai.py check-antigravity [on\|off]` | Show, or persist, whether Antigravity's live usage check runs by default. |
+| `./selectorai.py check-grok [on\|off]` | Show, or persist, whether Grok's live usage check (tmux-driven) runs by default. |
 | `./selectorai.py background [on\|off]` | Show, or persist, whether launches run inside a reattachable tmux session. |
 | `./selectorai.py models [provider...]` | Refresh + print model listings for every installed provider (or the ones named). |
 | `./selectorai.py theme [name]` | Show + pick, or set directly, the picker's visual theme. |
@@ -88,6 +89,7 @@ Global flags, valid anywhere before or mixed into the above (parsed in
 | `--refresh`, `-r`, `--no-cache` | Force a fresh network probe of quota, bypassing the short-term cache. |
 | `--lang <code>` / `--lang=<code>` | One-off language override for this run only, not saved. |
 | `--check-antigravity` | One-off: probe Antigravity's live usage for this run only, not saved. |
+| `--check-grok` | One-off: probe Grok's live usage (tmux-driven) for this run only, not saved. |
 
 Bare picker / prompt mode only — parsed inside `cmd_menu()`, so they only
 take effect when `argv[0]` isn't one of the subcommands above (e.g.

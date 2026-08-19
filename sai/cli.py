@@ -10,8 +10,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 from sai import auth, cache, health, models, providers, session
 from sai.i18n import cmd_lang, resolve_lang, set_lang, t
-from sai.paths import CHECK_ANTIGRAVITY_FILE, ENTRY_SCRIPT, LAUNCH_LOG, STATE_DIR, THEMES_DIR
-from sai.providers import antigravity
+from sai.paths import CHECK_ANTIGRAVITY_FILE, CHECK_GROK_FILE, ENTRY_SCRIPT, LAUNCH_LOG, STATE_DIR, THEMES_DIR
+from sai.providers import antigravity, grok
 from sai.providers.base import render_status_rows
 from sai.sysinfo import machine_status, who_status
 from sai.themes import cmd_theme, current_theme
@@ -63,6 +63,36 @@ def cmd_check_antigravity(argv):
         print("  ./selectorai.py check-antigravity on   # persist: always probe")
         print("  ./selectorai.py check-antigravity off  # persist: opt-in only (default)")
         print("  ./selectorai.py --check-antigravity    # probe just for this one run, don't persist")
+
+
+# ---------------------------------------------------------------------------
+# check-grok — persisted opt-in toggle for Grok's live tmux-driven probe.
+# ---------------------------------------------------------------------------
+
+
+def cmd_check_grok(argv):
+    if argv and argv[0] == "on":
+        CHECK_GROK_FILE.write_text("1")
+        print(
+            "Grok live usage check: ON by default now — every `status`/menu run will "
+            "open a throwaway `grok` session in tmux to read its Usage limit tab "
+            "(see sai.providers.grok._live_usage_limit).\nThis takes several seconds "
+            "(cold start can be ~15-20s) and depends on grok's current TUI layout, "
+            "unlike the other providers' checks.\n"
+            "Turn it back off any time: ./selectorai.py check-grok off"
+        )
+    elif argv and argv[0] == "off":
+        CHECK_GROK_FILE.unlink(missing_ok=True)
+        print(
+            "Grok live usage check: OFF by default (back to opt-in only — pass "
+            "--check-grok for a single run instead)."
+        )
+    else:
+        state = "on" if CHECK_GROK_FILE.exists() else "off"
+        print(f"Grok live usage check is currently: {state}")
+        print("  ./selectorai.py check-grok on   # persist: always probe")
+        print("  ./selectorai.py check-grok off  # persist: opt-in only (default)")
+        print("  ./selectorai.py --check-grok    # probe just for this one run, don't persist")
 
 
 # ---------------------------------------------------------------------------
@@ -296,10 +326,11 @@ def main():
 
     argv = sys.argv[1:]
 
-    # --lang/--lang=xx, --check-antigravity, and --refresh/-r/--no-cache
-    # are global overrides (no --check-grok: see sai.providers.grok.status)
+    # --lang/--lang=xx, --check-antigravity, --check-grok, and
+    # --refresh/-r/--no-cache are global overrides.
     lang_override = None
     check_antigravity_flag = False
+    check_grok_flag = False
     force_refresh = False
     filtered = []
     i = 0
@@ -317,6 +348,10 @@ def main():
             check_antigravity_flag = True
             i += 1
             continue
+        if a == "--check-grok":
+            check_grok_flag = True
+            i += 1
+            continue
         if a in ("--refresh", "-r", "--no-cache"):
             force_refresh = True
             i += 1
@@ -326,10 +361,14 @@ def main():
     argv = filtered
 
     # Flag above is a one-off, this-run-only override. Absent that, fall
-    # back to the persisted preference (`check-antigravity on/off`).
+    # back to the persisted preference (`check-antigravity on/off`,
+    # `check-grok on/off`).
     if not check_antigravity_flag and CHECK_ANTIGRAVITY_FILE.exists():
         check_antigravity_flag = True
     antigravity.set_check_enabled(check_antigravity_flag)
+    if not check_grok_flag and CHECK_GROK_FILE.exists():
+        check_grok_flag = True
+    grok.set_check_enabled(check_grok_flag)
 
     set_lang(resolve_lang(lang_override))
 
@@ -343,6 +382,8 @@ def main():
         auth.cmd_auth(argv[1:])
     elif argv and argv[0] == "check-antigravity":
         cmd_check_antigravity(argv[1:])
+    elif argv and argv[0] == "check-grok":
+        cmd_check_grok(argv[1:])
     elif argv and argv[0] == "background":
         session.cmd_background(argv[1:])
     elif argv and argv[0] == "models":

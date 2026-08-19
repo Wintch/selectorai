@@ -13,7 +13,26 @@ from pathlib import Path
 from sai import providers
 from sai.i18n import t
 
-_URL_BLOCK_RE = re.compile(r"https?://\S.*", re.S)
+# Deliberately NOT `https?://\S.*` with re.S (an earlier version): that
+# matched from the first "https?://" to the END of the captured output,
+# on the theory that a CLI-wrapped URL is followed by a blank line before
+# any other prose. Confirmed live to be wrong when a login command's OWN
+# error text embeds a URL mid-sentence with no blank line after it (e.g.
+# grok's device-auth flow on a DNS failure: "Error: error sending request
+# for url (https://auth.x.ai/oauth2/device/code): client error (Connect):
+# dns error: ..."), which fell through as run_login_capture's ONLY match —
+# `block.split("\n\n")[0]` never found a blank line to stop at, so the
+# whitespace-stripped "clean URL" ended up mashing the entire error
+# message onto the end of the real URL, e.g. "...device/code):
+# clienterror(Connect):dnserror:failedtolookupaddressinformation:Tryagain".
+# This version instead stops at the first space or ")" — a wrapped URL's
+# own line breaks have no such character before the next fragment (each
+# `\n[^\s)]+` chunk requires a non-blank, non-")"-led continuation right
+# after the newline, so a real blank line naturally ends the match too,
+# same stopping behavior the old `.split("\n\n")[0]` was for), while
+# trailing prose on the same line — wrapped or not — now can't be
+# swallowed into the URL at all.
+_URL_BLOCK_RE = re.compile(r"https?://[^\s)]+(?:\n[^\s)]+)*")
 
 
 def run_login_capture(p):
@@ -43,8 +62,11 @@ def run_login_capture(p):
         full = Path(logfile).read_text(errors="replace")
         m = _URL_BLOCK_RE.search(full)
         if m:
-            block = m.group(0).split("\n\n")[0]
-            clean_url = re.sub(r"\s+", "", block)
+            # No `.split("\n\n")[0]` here (an earlier version had one): the
+            # regex above can no longer match across a blank line at all,
+            # so m.group(0) never contains "\n\n" to split on in the first
+            # place — see the regex's own comment.
+            clean_url = re.sub(r"\s+", "", m.group(0))
             print()
             print(t("auth_clean_url", url=clean_url))
     finally:

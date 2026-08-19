@@ -1,16 +1,24 @@
 """Grok Build (xAI) provider.
 
-No CHECK_GROK gate to match Antigravity's: confirmed (not just
-precautionary) that there's no live usage check to gate in the first
-place — see status() below for why.
+Live usage check, gated behind --check-grok / `check-grok on` — same
+opt-in-only shape as Antigravity's --check-antigravity, for a related but
+distinct reason: this doesn't risk a surprise OAuth popup, but it does
+mean spinning up a real interactive `grok` session inside a throwaway
+tmux window just to read one screen, which is slow (~5-20s) and coupled
+to grok's current TUI layout in a way a flag or JSON endpoint wouldn't be.
+See _live_usage_limit() below for what's confirmed and why headless mode
+can't do this instead.
 """
 import os
+import re
 import subprocess
+import time
 from pathlib import Path
 
 from sai import session
 from sai.i18n import t
 from sai.providers.base import parse_model_lines
+from sai.timeutil import _reset_with_countdown
 
 NAME = "grok"
 LABEL = "Grok Build (xAI)"
@@ -21,6 +29,21 @@ UPDATE_CMD = ["grok", "update"]
 # flow (phone-friendly, vs. defaulting to auto-opening a local browser).
 LOGIN_CMD = ["grok", "login", "--device-auth"]
 LOGIN_STATUS_CMD = None  # no non-interactive status subcommand exposed either
+
+# Module state for the --check-grok gate, same "module state behind
+# get_/set_ instead of a bare global" shape as sai.providers.antigravity's
+# _check_enabled, for the same cross-module reason (sai.cli reads/writes
+# it, sai.cache's fetch_all_statuses reads it to decide cache freshness).
+_check_enabled = False
+
+
+def get_check_enabled():
+    return _check_enabled
+
+
+def set_check_enabled(value):
+    global _check_enabled
+    _check_enabled = value
 
 
 def last_used_epoch():
@@ -52,26 +75,127 @@ def last_used_epoch():
     return int(latest)
 
 
+_PROBE_SESSION = "selectorai-grok-probe"
+_PROBE_READY_TIMEOUT = 20  # seconds — grok's own TUI boot time, observed
+# live between 1s (warm) and ~15s (cold/slow network) on the machine this
+# was built against; 20s leaves headroom without hanging forever on a
+# genuinely broken session.
+
+
+def _tmux(*args, timeout=10):
+    try:
+        return subprocess.run(["tmux", *args], capture_output=True, text=True, timeout=timeout)
+    except Exception:
+        return None
+
+
+def _capture_probe_pane():
+    r = _tmux("capture-pane", "-t", _PROBE_SESSION, "-p")
+    return r.stdout if r is not None and r.returncode == 0 else ""
+
+
+def _live_usage_limit():
+    """Scrapes the "Usage limit" tab of grok's own `/info` popup inside a
+    throwaway tmux session — confirmed live (2026-08-18, Grok Build 1.0.5,
+    free grok.com account) to be the ONLY place this data exists:
+
+      - `grok -p "/status" --output-format json` (the same trick that
+        works for Claude/Antigravity's headless usage) returns session
+        info only (session ID, model, turn, context tokens) — no usage/
+        reset fields at all, confirmed via the raw JSON.
+      - `/usage`/`/cost` are not real slash commands in headless mode
+        either — sent as a literal chat prompt, the model tries to
+        research an answer instead of the CLI intercepting it.
+      - `/info` (alias `/status`, `/session-info`) IS intercepted
+        headlessly, but only returns that same session-info text — the
+        tabbed popup (Context usage / Usage limit / Session info) a real
+        interactive render produces is a pager-only UI feature with no
+        headless equivalent.
+
+    So the only way to reach "Weekly limit (Free) ... Resets: <date>" is
+    to actually open the popup in a live render and read the screen:
+    `/info` lands on "Session info" first, Tab cycles to "Context usage"
+    then "Usage limit" (confirmed live; order intentionally not assumed
+    fixed — this Tabs up to 3 times and stops as soon as "Weekly limit"
+    appears in the pane, so a future reorder doesn't silently break it).
+
+    Returns (label, pct_used, reset_text) or None if grok's session never
+    became ready, or the pane never showed the Usage limit tab (e.g.
+    reordered popup UI in a future grok version). Never raises.
+    """
+    if not session.available():  # tmux itself missing
+        return None
+    _tmux("kill-session", "-t", _PROBE_SESSION)  # clear any stale probe
+    started = _tmux(
+        "new-session", "-d", "-s", _PROBE_SESSION, "-x", "200", "-y", "50", "grok",
+        timeout=10,
+    )
+    if started is None or started.returncode != 0:
+        return None
+    try:
+        ready = False
+        for _ in range(_PROBE_READY_TIMEOUT):
+            if re.search(r"│\s*❯", _capture_probe_pane()):
+                ready = True
+                break
+            time.sleep(1)
+        if not ready:
+            return None
+
+        _tmux("send-keys", "-t", _PROBE_SESSION, "/info")
+        time.sleep(0.3)
+        _tmux("send-keys", "-t", _PROBE_SESSION, "Enter")
+        time.sleep(2)
+
+        pane = _capture_probe_pane()
+        for _ in range(3):
+            if "Weekly limit" in pane:
+                break
+            _tmux("send-keys", "-t", _PROBE_SESSION, "Tab")
+            time.sleep(1)
+            pane = _capture_probe_pane()
+        else:
+            return None
+
+        # Label captured verbatim from the pane ("Weekly limit (Free)",
+        # or presumably "(Plus)"/"(Heavy)" on a paid tier — never seen
+        # live, so not hardcoded) rather than a static i18n string, same
+        # reasoning as Antigravity's row labels below: it's grok's own
+        # English UI text, not something this script authors itself.
+        label_m = re.search(r"Weekly limit[^\n│]*", pane)
+        if not label_m:
+            return None
+        # Anchored to start searching *after* the label match, not the
+        # whole pane — a stale render of the previously-open tab (e.g.
+        # "Context usage"'s own "(0.71%)" text) can still be on screen a
+        # frame after Tab is sent, and that lives before "Weekly limit"
+        # in the captured text, never after it.
+        rest = pane[label_m.end():]
+        pct_m = re.search(r"(\d+)%", rest)
+        reset_m = re.search(r"Resets:\s*([^\n│]+)", rest)
+        if not pct_m or not reset_m:
+            return None
+        return label_m.group(0).strip(), int(pct_m.group(1)), reset_m.group(1).strip()
+    finally:
+        _tmux("send-keys", "-t", _PROBE_SESSION, "Escape")
+        time.sleep(0.2)
+        _tmux("kill-session", "-t", _PROBE_SESSION)
+
+
 def status():
-    # Two confirmations stack here, not one:
-    # 1. Docs (~/.grok/docs/user-guide/04-slash-commands.md,
-    #    14-headless-mode.md): `/usage`/`/cost` are real but TUI-only —
-    #    headless mode (`-p`) sends its argument as a literal chat prompt,
-    #    it does not interpret slash commands at all, and there's no CLI
-    #    subcommand for this either (checked the full `grok --help`
-    #    command list). So this could never work headlessly regardless of
-    #    account type.
-    # 2. Confirmed live, free account (grok.com login, no API key/billing):
-    #    `/usage` and `/cost` inside the actual TUI show nothing — no
-    #    credit balance to check exists at all for this account type. The
-    #    server just cuts you off past an undocumented limit and pushes an
-    #    upgrade prompt, no reset time given anywhere. So even the
-    #    interactive path has nothing to surface, not just the headless one.
-    #
-    # Don't even try `grok -p "/usage"`: it would spend real tokens/credits
-    # sending the model the literal text "/usage" as a prompt, for a
-    # response that still wouldn't contain parseable usage data.
-    return {"pct_used": None, "rows": [], "note": t("note_grok_no_headless_usage"), "kind": "no-usage-api"}
+    if not _check_enabled:
+        return {"pct_used": None, "rows": [], "note": t("note_grok_skipped"), "kind": "not-checked"}
+    result = _live_usage_limit()
+    if result is None:
+        # Deliberately "no-usage-api", not "auth-needed": unlike
+        # Antigravity's empty-rows case (confirmed to specifically mean
+        # sign-in-needed), a None here can just as easily mean the tmux
+        # probe timed out or grok's popup layout moved — not a login
+        # problem, so it shouldn't claim OFFLINE via health_reason_auth.
+        return {"pct_used": None, "rows": [], "note": t("note_grok_no_usage"), "kind": "no-usage-api"}
+    label, pct_used, reset_text = result
+    row = (label, pct_used, _reset_with_countdown(reset_text))
+    return {"pct_used": pct_used, "rows": [row], "note": None, "kind": "ok"}
 
 
 def list_models():

@@ -69,12 +69,22 @@ list_models()     # -> list[str] | None
 
 5. **Find (or rule out) a non-interactive usage/quota query.** Try
    `<binary> --help` for a `usage`/`status`/`quota` subcommand, then a
-   flag on the main command, then a documented but TUI-only slash command
-   (which counts as *not* available — see Grok's `/usage`, TUI-only per
-   its own docs). If nothing non-interactive exists, `status()` should
-   return `kind: "no-usage-api"` and a clear `note`, same as Codex/Grok
-   today — don't leave `pct_used` guessing at a number that was never
-   really queried.
+   flag on the main command, then a documented but TUI-only slash command.
+   A TUI-only command means *headlessly* not available — try the flag/JSON
+   route first (e.g. `<binary> -p "/status" --output-format json`, if the
+   CLI has an `-p`/single-prompt mode at all) before concluding there's no
+   query at all. Even if the specific data lives only in a pager-only UI
+   panel with no headless or JSON path whatsoever (confirmed for Grok's
+   "Usage limit" tab — see
+   [`docs/NOTES.md`](NOTES.md#groks---check-grok--live-but-via-a-tmux-driven-tui-scrape-not-a-flag)),
+   that's not automatically a dead end: a tmux-driven scrape (open the real
+   TUI in a throwaway tmux session, drive it with `send-keys`, read the
+   result with `capture-pane -p`) is a legitimate last resort, gated behind
+   its own opt-in flag like `--check-grok`, same shape as
+   `--check-antigravity`. Only fall back to `kind: "no-usage-api"` and a
+   clear `note` (same as Codex/Grok's own probe-failure path today) once
+   neither a headless query nor a scriptable TUI scrape exists — don't
+   leave `pct_used` guessing at a number that was never really queried.
 
 6. **Find the "last used" signal.** Every existing provider derives this
    from the CLI's own local history file mtime (`~/.claude/history.jsonl`,

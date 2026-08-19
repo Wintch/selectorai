@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from sai import health, providers
 from sai.i18n import t
 from sai.paths import CACHE_FILE
-from sai.providers import antigravity
+from sai.providers import antigravity, grok
 
 DEFAULT_CACHE_TTL = 60  # seconds
 
@@ -116,17 +116,28 @@ def _merge_save(section, data):
         save_cache(cache)
 
 
-# Antigravity gets a much longer cache window than everything else — not
-# for freshness (a weekly quota doesn't need per-minute updates), but as a
-# backoff: its own session handling is flaky upstream (antigravity-cli
-# issues #57/#18), so a live check can trigger a fresh Google OAuth popup
-# even right after a prior success. With the default 60s TTL, every picker
-# launch more than a minute apart re-attempts the risky call — this stretches
-# that to once per half hour at most (still forced sooner if the
-# --check-antigravity toggle itself just changed — see the was_skipped
-# check in fetch_all_statuses, which bypasses this TTL entirely for that
-# specific case).
-_CACHE_TTL_OVERRIDES = {"antigravity": 1800}
+# Antigravity and Grok both get a much longer cache window than everything
+# else — not for freshness (a weekly quota doesn't need per-minute
+# updates), but as a backoff, for two different reasons:
+#   - Antigravity: its own session handling is flaky upstream
+#     (antigravity-cli issues #57/#18), so a live check can trigger a
+#     fresh Google OAuth popup even right after a prior success.
+#   - Grok: its live check (sai.providers.grok._live_usage_limit) opens a
+#     real interactive session in a throwaway tmux window just to read one
+#     screen — several seconds every time, more on a cold start.
+# With the default 60s TTL, every picker launch more than a minute apart
+# would re-attempt either risky/slow call — this stretches that to once
+# per half hour at most (still forced sooner if the relevant toggle itself
+# just changed — see the was_skipped check in fetch_all_statuses, which
+# bypasses this TTL entirely for that specific case).
+_CACHE_TTL_OVERRIDES = {"antigravity": 1800, "grok": 1800}
+
+# Providers whose status() is gated behind a persisted opt-in toggle (see
+# sai.cli.cmd_check_antigravity/cmd_check_grok) — mapped to the module
+# that owns get_check_enabled() for that provider, so fetch_all_statuses
+# below can detect "the toggle flipped since this cache entry was
+# written" generically instead of hardcoding one provider's name.
+_CHECK_GATED_PROVIDERS = {"antigravity": antigravity, "grok": grok}
 
 
 def _cache_ttl(p):
@@ -147,7 +158,7 @@ def fetch_all_statuses(provider_list, force_refresh=False, show_progress=True):
             ts = entry.get("timestamp", 0)
             st = entry.get("status")
             if now - ts < _cache_ttl(p) and st is not None:
-                if p == "antigravity":
+                if p in _CHECK_GATED_PROVIDERS:
                     # Compare the structured `kind` field, not the
                     # rendered `note` string (which is localized and
                     # would never match once LANG != the language the
@@ -159,13 +170,10 @@ def fetch_all_statuses(provider_list, force_refresh=False, show_progress=True):
                     # self-heals old caches into the new shape on next
                     # write instead of needing a migration.
                     was_skipped = st.get("kind") == "not-checked"
-                    check_enabled = antigravity.get_check_enabled()
+                    check_enabled = _CHECK_GATED_PROVIDERS[p].get_check_enabled()
                     if (check_enabled and was_skipped) or (not check_enabled and not was_skipped):
                         to_query.append(p)
                         continue
-                # No grok equivalent: its status never depends on a toggle
-                # anymore (see sai.providers.grok.status), so plain TTL
-                # caching is enough — nothing to detect a mismatch against.
                 statuses[p] = st
                 continue
         to_query.append(p)

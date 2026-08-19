@@ -2,10 +2,11 @@
 
 A linear walkthrough of every other subcommand, in the order a brand-new
 user would actually want them (language first, so the rest of the flow
-speaks their language; providers; auth; the risky Antigravity check;
-tmux; theme; models; a final status refresh). Every step is skippable
-(Enter/N moves on) and reuses the real command it's offering rather than
-re-implementing it — see each step below for exactly which function.
+speaks their language; providers; auth; the risky Antigravity and Grok
+live-check gates; tmux; theme; models; a final status refresh). Every
+step is skippable (Enter/N moves on) and reuses the real command it's
+offering rather than re-implementing it — see each step below for
+exactly which function.
 
 Interactive-only, like `auth`/`lang`/`theme`'s own interactive paths: it
 calls `input()` through sai.i18n._prompt, so stdin+stdout must both be a
@@ -15,12 +16,13 @@ run instead of running it — this is what tests/test_installer.py and the
 README exercise, since nothing else in this codebase is allowed to spawn
 `claude`/`codex`/`agy`/`grok` or write real prefs from an automated run.
 
-Import note: this module imports `cmd_status` from sai.cli (step 9 below)
-to reuse its status-block rendering instead of duplicating it. sai/cli.py
-therefore imports `cmd_setup` from here with a *deferred* import inside
-main()'s dispatch, not at module load time — a top-level import on both
-sides would be a real cycle (sai.cli would need sai.installer fully built
-before it finishes defining cmd_status, which sai.installer needs).
+Import note: this module imports `cmd_status` from sai.cli (step 10
+below) to reuse its status-block rendering instead of duplicating it.
+sai/cli.py therefore imports `cmd_setup` from here with a *deferred*
+import inside main()'s dispatch, not at module load time — a top-level
+import on both sides would be a real cycle (sai.cli would need
+sai.installer fully built before it finishes defining cmd_status, which
+sai.installer needs).
 """
 import subprocess
 import sys
@@ -28,7 +30,7 @@ import sys
 from sai import auth, providers, session
 from sai.i18n import _prompt, cmd_lang, t
 from sai.models import cmd_models
-from sai.paths import CHECK_ANTIGRAVITY_FILE
+from sai.paths import CHECK_ANTIGRAVITY_FILE, CHECK_GROK_FILE
 from sai.sysinfo import machine_status
 from sai.themes import cmd_theme
 
@@ -103,6 +105,19 @@ def _step_antigravity(dry_run):
         print(t("setup_antigravity_hint", cmd="./selectorai.py check-antigravity on"))
 
 
+def _step_grok_check(dry_run):
+    print(t("setup_step_grok_check"))
+    if not providers.installed("grok"):
+        print(t("setup_grok_check_not_installed"))
+        return
+    print(t("setup_grok_check_caveat"))
+    if _offer(dry_run, "setup_confirm_grok_check_on", "setup_would_grok_check_on"):
+        CHECK_GROK_FILE.write_text("1")
+        print(t("setup_grok_check_on_done"))
+    else:
+        print(t("setup_grok_check_hint", cmd="./selectorai.py check-grok on"))
+
+
 def _step_tmux():
     print(t("setup_step_tmux"))
     if session.available():
@@ -158,20 +173,27 @@ def cmd_setup(argv):
     _step_antigravity(dry_run)
     print()
 
-    # 6. tmux — informational only, nothing to confirm: either it's there
+    # 6. Grok's live usage check — same off-by-default, explain-and-offer
+    # shape as Antigravity's step above, but a different caveat (no OAuth
+    # popup risk; instead a slow tmux-driven TUI scrape — see
+    # sai.providers.grok._live_usage_limit).
+    _step_grok_check(dry_run)
+    print()
+
+    # 7. tmux — informational only, nothing to confirm: either it's there
     # and already doing its default-on thing, or it isn't and the feature
     # just stays dormant until installed. shutil.which only, no subprocess
     # spawn either way, so safe under --dry-run with no special-casing.
     _step_tmux()
     print()
 
-    # 7. Theme — same "reuse the interactive path" shape as language.
+    # 8. Theme — same "reuse the interactive path" shape as language.
     print(t("setup_step_theme"))
     if _offer(dry_run, "setup_confirm_theme", "setup_would_theme"):
         cmd_theme([])
     print()
 
-    # 8. Model listings — reuses cmd_models() wholesale, including its
+    # 9. Model listings — reuses cmd_models() wholesale, including its
     # own i18n'd caution about antigravity/grok possibly prompting a
     # browser login (see sai.models._RISKY_PROVIDERS).
     print(t("setup_step_models"))
@@ -179,7 +201,7 @@ def cmd_setup(argv):
         cmd_models([])
     print()
 
-    # 9. Final status refresh — reuses sai.cli.cmd_status (see this
+    # 10. Final status refresh — reuses sai.cli.cmd_status (see this
     # module's docstring for why the import below is deferred rather
     # than at module load time) instead of re-fetching/re-rendering
     # provider statuses by hand. Explicitly skips all network/subprocess
