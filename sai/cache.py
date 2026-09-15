@@ -270,3 +270,52 @@ def fetch_service_states_cached(provider_list, force_refresh=False):
         section[p] = {"timestamp": int(now), "state": state}
     _merge_save("service", section)
     return states
+
+
+# Version/update checks change far less often than quota or service status
+# — a few hours of staleness costs nothing — so this gets its own long TTL
+# rather than reusing DEFAULT_CACHE_TTL/SERVICE_CACHE_TTL above. Unlike
+# Antigravity/Grok's quota-check overrides (a backoff against a risky/slow
+# call), there's nothing to gate here: each provider's own check_update()
+# already decides whether it's safe to call at all (Antigravity's returns
+# None unconditionally — see sai/providers/antigravity.py), so this cache
+# just holds whatever comes back, real result or None, at the same TTL.
+UPDATE_CACHE_TTL = 6 * 3600
+
+
+def fetch_update_info_cached(provider_list, force_refresh=False):
+    """Same cache-then-probe shape as fetch_service_states_cached above,
+    applied to providers.check_update instead of health.fetch_service_states.
+    Returns {p: check_update() result | None} for every p in
+    provider_list."""
+    now = time.time()
+    cache = load_cache() if not force_refresh else {}
+    cached_map = cache.get("update_info", {})
+
+    info = {}
+    to_query = []
+    for p in provider_list:
+        if not force_refresh and p in cached_map:
+            entry = cached_map[p]
+            if now - entry.get("timestamp", 0) < UPDATE_CACHE_TTL:
+                info[p] = entry.get("info")
+                continue
+        to_query.append(p)
+
+    if not to_query:
+        return info
+
+    section = dict(cached_map)
+    with ThreadPoolExecutor(max_workers=len(to_query)) as ex:
+        fut_to_p = {ex.submit(providers.check_update, p): p for p in to_query}
+        for fut in as_completed(fut_to_p):
+            p = fut_to_p[fut]
+            try:
+                result = fut.result()
+            except Exception:
+                result = None
+            info[p] = result
+            section[p] = {"timestamp": int(now), "info": result}
+
+    _merge_save("update_info", section)
+    return info

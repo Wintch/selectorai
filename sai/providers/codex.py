@@ -1,4 +1,5 @@
 """Codex CLI provider."""
+import json
 import os
 import re
 import subprocess
@@ -88,6 +89,29 @@ def list_models():
     # flag on individual invocations, with no enumerable list exposed by
     # the CLI at all. Nothing to return.
     return None
+
+
+def check_update():
+    # `~/.codex/version.json` is maintained by Codex itself in the
+    # background (confirmed live, docs/CAPABILITIES.md), e.g.
+    # {"latest_version":"0.154.0","last_checked_at":"...",
+    # "dismissed_version":null} — a pure file read, no network call
+    # needed for the check itself. `codex --version` (installed version)
+    # is likewise local/instant, just the binary printing its own build.
+    try:
+        installed = subprocess.run(
+            ["codex", "--version"], capture_output=True, text=True, timeout=5
+        ).stdout.strip().split()[-1]
+    except Exception:
+        installed = None
+    try:
+        latest = json.loads((Path.home() / ".codex" / "version.json").read_text()).get("latest_version")
+    except Exception:
+        latest = None
+    if installed is None and latest is None:
+        return None
+    update_available = (installed != latest) if (installed and latest) else None
+    return {"installed": installed, "latest": latest, "update_available": update_available}
 
 
 def launch(yolo, prompt, cont):

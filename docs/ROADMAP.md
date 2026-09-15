@@ -26,21 +26,15 @@ of plugins, skills, MCP servers, subagents, update checks, and session
 listing — ranked by what's actually confirmed safe to build on today vs.
 what needs more confirmation first.
 
-### 1. Read-only update-check surfaced in `status`/the picker
+### ~~1. Read-only update-check surfaced in `status`/the picker~~ — shipped
 
-Three of four already have a confirmed local, no-mutate way to compare
-installed vs. latest version: Claude (`claude doctor`), Codex (`~/.codex/
-version.json`, no command even needed), Grok (`grok update --check
---json`). Antigravity is the one gap — `agy update --help` doesn't confirm
-read-only behavior, so it'd need the same opt-in-gate treatment
-`--check-antigravity` already gets for its OAuth-popup risk, or stay
-excluded until confirmed in a disposable environment. Extends the provider
-contract with one new optional function (`check_update()`, `None` when
-unverified/unsafe — same shape `list_models()` already uses), lowest
-implementation risk of anything in this section since three of four need
-no gating at all.
+Extended the provider contract with `check_update()` (Claude/Codex/Grok
+confirmed safe, Antigravity's returns `None` per the gap above) and wired
+it in as a third automatic parallel probe next to quota/service status.
+Full writeup, exact commands, and the caching/i18n details:
+[`docs/NOTES.md`](NOTES.md#update-checks--automatic-unlike-models).
 
-### 2. Session browsing beyond blind `--continue`
+### 1. Session browsing beyond blind `--continue`
 
 Grok's `grok sessions list` is confirmed to return real history with
 summaries — a genuine browser, not just "resume most recent." Codex's bare
@@ -51,7 +45,7 @@ listing subcommand found. Where a listing exists, the picker could offer
 current binary choice (pass `-c` or don't); where it doesn't, nothing
 changes from today's behavior.
 
-### 3. Context-cost warning for always-on skills/plugins — Claude Code only, for now
+### 2. Context-cost warning for always-on skills/plugins — Claude Code only, for now
 
 `claude plugin details <name>` gives a real number (confirmed:
 `frontend-design` costs ~78-80 tokens on every session whether it's used
@@ -66,11 +60,11 @@ enabled plugin and prints the token cost — Claude-only, explicitly not
 promising parity across providers until the other three's gaps close
 upstream.
 
-### 4. Try Grok's own `learn` skill before building a selectorai-native equivalent
+### 3. Try Grok's own `learn` skill before building a selectorai-native equivalent
 
 Grok already ships a bundled skill (`~/.grok/bundled/skills/learn/`)
 described as retiring skills, plugins, or MCP servers that are never
-used — exactly the shape of feature under consideration for #3 above, at
+used — exactly the shape of feature under consideration for #2 above, at
 least for grok's own surface. Not yet independently verified for
 behavior/safety; worth an actual trial run before deciding whether
 selectorai needs to build anything here at all versus just pointing users

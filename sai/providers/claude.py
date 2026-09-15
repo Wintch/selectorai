@@ -68,6 +68,31 @@ def list_models():
     return list(_STATIC_MODEL_ALIASES)
 
 
+def check_update():
+    # `claude doctor` is local and confirmed live not to require login
+    # (docs/CAPABILITIES.md) — safe to call automatically on every
+    # status/menu run, unlike `claude update`, which would actually
+    # install one. Real confirmed output:
+    #   Running: native (2.1.272)
+    #   ...
+    #   Last update attempt: success → 2.1.272 (2026-09-15)
+    # "latest" here means "whatever version the last successful
+    # auto-update attempt installed" — doctor doesn't expose a separate
+    # "latest available" field, so that's the best available signal.
+    try:
+        out = subprocess.run(["claude", "doctor"], capture_output=True, text=True, timeout=15).stdout
+    except Exception:
+        return None
+    installed = _extract(out, r"Running: \S+ \(([^)]+)\)")
+    if installed is None:
+        return None
+    attempt_status = _extract(out, r"Last update attempt: (\S+)")
+    attempt_version = _extract(out, r"Last update attempt: \S+ → (\S+)")
+    latest = attempt_version if attempt_status == "success" else None
+    update_available = (installed != latest) if latest else None
+    return {"installed": installed, "latest": latest, "update_available": update_available}
+
+
 def launch(yolo, prompt, cont):
     # Default: --permission-mode auto — Claude Code's own classifier
     # (rules-based allow/soft_deny/hard_deny, see `claude auto-mode

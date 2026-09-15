@@ -13,7 +13,7 @@ from sai import health, models, providers
 from sai.bigfont import render_big
 from sai.i18n import LANG_CODES, get_lang, set_lang, t
 from sai.paths import LANG_FILE, THEME_FILE
-from sai.providers.base import render_status_rows
+from sai.providers.base import render_status_rows, render_update_line
 from sai.sysinfo import machine_status
 from sai.themes import current_theme, list_themes
 from sai.timeutil import fmt_ago
@@ -72,7 +72,7 @@ def _health_for(p, statuses, service_states):
     return health.classify(p, status, service_states.get(p))
 
 
-def _build_app(provider_list, statuses, service_states, theme_path, reattach=None):
+def _build_app(provider_list, statuses, service_states, theme_path, reattach=None, update_info=None):
     """Construct the picker App instance without running it. Split out of
     run_picker() below purely so tests/test_picker_headless.py can drive it
     through Textual's own `app.run_test()` pilot (which needs an
@@ -84,7 +84,12 @@ def _build_app(provider_list, statuses, service_states, theme_path, reattach=Non
     [...]} built by sai.cli (see its _reattach_descriptor()) from
     sai.session's tmux calls — this module makes no tmux calls of its own,
     it only renders whatever descriptor it's handed. When present, a
-    special reattach row is shown first in the OptionList."""
+    special reattach row is shown first in the OptionList.
+
+    update_info: None, or {p: check_update() result | None} from
+    sai.cache.fetch_update_info_cached, rendered as one extra detail-panel
+    line via render_update_line — omitted entirely (not even a "unknown"
+    line) for a provider whose result is itself None."""
     from textual.app import App, ComposeResult
     from textual.containers import Vertical
     from textual.widgets import Footer, OptionList, Static
@@ -217,6 +222,9 @@ def _build_app(provider_list, statuses, service_states, theme_path, reattach=Non
             models_line = models.models_line(p)
             if models_line:
                 lines.append(f"  {models_line}")
+            update_line = render_update_line((update_info or {}).get(p))
+            if update_line:
+                lines.append(f"  {update_line}")
             last = providers.last_used_epoch(p)
             lines = lines + ["", t("last_used", ago=fmt_ago(last))]
             self.query_one("#detail", Static).update("\n".join(lines))
@@ -260,15 +268,17 @@ def _build_app(provider_list, statuses, service_states, theme_path, reattach=Non
     return _SelectorApp()
 
 
-def run_picker(provider_list, statuses, service_states, theme_path, reattach=None):
+def run_picker(provider_list, statuses, service_states, theme_path, reattach=None, update_info=None):
     """provider_list: order list of provider keys (see sai.cli.build_provider_list).
     statuses: {p: status dict} from fetch_all_statuses, used to render the
     detail panel. service_states: {p: "operational"|"degraded"|"outage"|
     None} from fetch_service_states_cached, folded into classify() for
     both the health line and the ONLINE/WARNING vs OFFLINE grouping.
     reattach: see _build_app's docstring — None or a descriptor dict.
+    update_info: see _build_app's docstring — None or {p: check_update()
+    result | None} from sai.cache.fetch_update_info_cached.
     Returns a provider id, None (deliberate quit), _REATTACH (see
     sai.cli.cmd_menu, which execs `tmux attach-session` on seeing this
     back), or one of the _RESTART_* sentinels (language/theme changed from
     inside the picker — cmd_menu reloads and calls this again)."""
-    return _build_app(provider_list, statuses, service_states, theme_path, reattach).run()
+    return _build_app(provider_list, statuses, service_states, theme_path, reattach, update_info).run()

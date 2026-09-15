@@ -12,7 +12,7 @@ from sai import auth, cache, health, models, providers, session
 from sai.i18n import cmd_lang, resolve_lang, set_lang, t
 from sai.paths import CHECK_ANTIGRAVITY_FILE, CHECK_GROK_FILE, ENTRY_SCRIPT, LAUNCH_LOG, STATE_DIR, THEMES_DIR
 from sai.providers import antigravity, grok
-from sai.providers.base import render_status_rows
+from sai.providers.base import render_status_rows, render_update_line
 from sai.sysinfo import machine_status, who_status
 from sai.themes import cmd_theme, current_theme
 from sai.timeutil import fmt_ago
@@ -105,7 +105,7 @@ def log_launch(provider, mode):
         f.write(f"{int(time.time())}\t{provider}\t{mode}\n")
 
 
-def print_status_block(p, status, service_state):
+def print_status_block(p, status, service_state, update_info=None):
     last = providers.last_used_epoch(p)
     print(t("status_last_used", label=providers.label(p), ago=fmt_ago(last)))
     state, reason_key = health.classify(p, status, service_state)
@@ -115,20 +115,29 @@ def print_status_block(p, status, service_state):
     line = models.models_line(p)
     if line:
         print(f"  {line}")
+    update_line = render_update_line(update_info)
+    if update_line:
+        print(f"  {update_line}")
     print()
 
 
-def _fetch_statuses_and_services(installed, force_refresh):
-    """Runs the quota-status probe and the service-status probe at the
-    same time (two threads, not two sequential blocking calls) so wiring
-    in the service check doesn't add wall time on top of what
-    fetch_all_statuses already took by itself — see docs/ARCHITECTURE.md's
-    health.py entry. Both callers below (cmd_status, build_provider_list)
-    need exactly this pair, so it's factored out here instead of repeated."""
-    with ThreadPoolExecutor(max_workers=2) as ex:
+def _fetch_provider_data(installed, force_refresh):
+    """Runs the quota-status probe, the service-status probe, and the
+    update-check probe all at the same time (three threads, not three
+    sequential blocking calls) so wiring in the newer two checks doesn't
+    add wall time on top of what fetch_all_statuses already took by
+    itself — see docs/ARCHITECTURE.md's health.py entry for the original
+    two-probe version of this reasoning, and docs/CAPABILITIES.md for why
+    the update check (claude/codex/grok confirmed safe, antigravity
+    always returns None) is safe to run unconditionally alongside the
+    other two rather than needing its own opt-in gate. Both callers below
+    (cmd_status, build_provider_list) need exactly this triple, so it's
+    factored out here instead of repeated."""
+    with ThreadPoolExecutor(max_workers=3) as ex:
         fut_statuses = ex.submit(cache.fetch_all_statuses, installed, force_refresh, True)
         fut_services = ex.submit(cache.fetch_service_states_cached, installed, force_refresh)
-        return fut_statuses.result(), fut_services.result()
+        fut_updates = ex.submit(cache.fetch_update_info_cached, installed, force_refresh)
+        return fut_statuses.result(), fut_services.result(), fut_updates.result()
 
 
 def cmd_status(args, force_refresh=False):
@@ -144,13 +153,13 @@ def cmd_status(args, force_refresh=False):
     print()
 
     installed = [p for p in providers.ORDER if providers.installed(p)]
-    statuses, service_states = _fetch_statuses_and_services(installed, force_refresh)
+    statuses, service_states, update_info = _fetch_provider_data(installed, force_refresh)
 
     for p in providers.ORDER:
         if not providers.installed(p):
             print(t("status_not_installed", label=providers.label(p)) + "\n")
             continue
-        print_status_block(p, statuses[p], service_states.get(p))
+        print_status_block(p, statuses[p], service_states.get(p), update_info.get(p))
 
 
 def build_provider_list(force_refresh=False):
@@ -159,13 +168,14 @@ def build_provider_list(force_refresh=False):
     off), just recency, which is simpler to predict: whatever you touched
     last is always at the top. Ties (e.g. two never-used providers) keep
     providers.ORDER's own order. Returns (providers, statuses,
-    service_states) — statuses is {p: status dict}, service_states is
-    {p: "operational"|"degraded"|"outage"|None}, used by both the plain
-    picker's grouping and the Textual picker's detail panel/grouping."""
+    service_states, update_info) — statuses is {p: status dict},
+    service_states is {p: "operational"|"degraded"|"outage"|None},
+    update_info is {p: check_update() result | None} — used by both the
+    plain picker's grouping and the Textual picker's detail panel/grouping."""
     installed = [p for p in providers.ORDER if providers.installed(p)]
-    statuses, service_states = _fetch_statuses_and_services(installed, force_refresh)
+    statuses, service_states, update_info = _fetch_provider_data(installed, force_refresh)
     installed.sort(key=lambda p: providers.last_used_epoch(p), reverse=True)
-    return installed, statuses, service_states
+    return installed, statuses, service_states, update_info
 
 
 def _reattach_descriptor():
@@ -247,7 +257,7 @@ def cmd_menu(argv, force_refresh=False):
                 os.execv(str(venv_python), [str(venv_python), str(ENTRY_SCRIPT)] + sys.argv[1:])
             print(t("menu_ui_failed"))
 
-    provider_list, statuses, service_states = build_provider_list(force_refresh=force_refresh)
+    provider_list, statuses, service_states, update_info = build_provider_list(force_refresh=force_refresh)
     if not provider_list:
         print(t("menu_none_installed", cmd=sys.argv[0]))
         sys.exit(1)
@@ -269,11 +279,13 @@ def cmd_menu(argv, force_refresh=False):
             # reflect the session's live state at that moment, same as
             # provider statuses already do on a lang restart.
             reattach = _reattach_descriptor()
-            result = run_picker(provider_list, statuses, service_states, theme_path, reattach=reattach)
+            result = run_picker(
+                provider_list, statuses, service_states, theme_path, reattach=reattach, update_info=update_info
+            )
             if result == _RESTART_THEME:
                 continue
             if result == _RESTART_LANG:
-                provider_list, statuses, service_states = build_provider_list(force_refresh=True)
+                provider_list, statuses, service_states, update_info = build_provider_list(force_refresh=True)
                 continue
             chosen = result
             break
@@ -284,7 +296,9 @@ def cmd_menu(argv, force_refresh=False):
             sys.exit(0)
     else:
         reattach = _reattach_descriptor()
-        chosen = run_plain_picker(provider_list, statuses, service_states, reattach=reattach)
+        chosen = run_plain_picker(
+            provider_list, statuses, service_states, reattach=reattach, update_info=update_info
+        )
         if chosen is None:
             print(t("menu_invalid"))
             sys.exit(1)

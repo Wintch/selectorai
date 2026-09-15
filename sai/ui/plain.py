@@ -1,7 +1,7 @@
 """Numbered fallback menu: no tty, or the Textual UI couldn't be set up."""
 from sai import health, models, providers
 from sai.i18n import _prompt, t
-from sai.providers.base import provider_summary
+from sai.providers.base import provider_summary, render_update_line
 from sai.sysinfo import machine_status
 from sai.timeutil import fmt_ago
 from sai.ui.picker import _REATTACH
@@ -9,7 +9,7 @@ from sai.ui.picker import _REATTACH
 _MISSING_STATUS = {"pct_used": None, "rows": [], "note": None, "kind": None}
 
 
-def _print_rows(provider_ids, statuses, classified, menu_provider, start):
+def _print_rows(provider_ids, statuses, classified, menu_provider, start, update_info=None):
     """Print one numbered row per provider, starting the running count at
     `start` — shared by both sections below so numbering stays continuous
     across the online/offline split (picking by number must still work for
@@ -41,6 +41,9 @@ def _print_rows(provider_ids, statuses, classified, menu_provider, start):
         models_line = models.models_line(p)
         if models_line:
             print(f"       {models_line}")
+        update_line = render_update_line((update_info or {}).get(p))
+        if update_line:
+            print(f"       {update_line}")
         if p == "grok" and status["rows"]:
             # Same caveat sai/providers/base.py's render_status_rows()
             # attaches for the Textual detail panel and `status` command —
@@ -53,14 +56,18 @@ def _print_rows(provider_ids, statuses, classified, menu_provider, start):
     return i
 
 
-def run_plain_picker(provider_list, statuses, service_states, reattach=None):
+def run_plain_picker(provider_list, statuses, service_states, reattach=None, update_info=None):
     """reattach: None, or the {"windows": [(name, ago_str), ...],
     "peek_lines": [...]} descriptor sai.cli._reattach_descriptor()
     builds from sai.session's tmux calls — this module makes no tmux
     calls of its own, same purity rule as sai/ui/picker.py. When present,
     it's offered as entry "0)", ahead of the numbered provider rows
     (which start at 1, unchanged) — same priority-first placement as the
-    Textual picker's reattach row."""
+    Textual picker's reattach row.
+
+    update_info: None, or {p: check_update() result | None} from
+    sai.cache.fetch_update_info_cached — see sai/ui/picker.py's
+    _build_app docstring for the same shape."""
     for line in machine_status():
         print(line)
     print(t("who_hint", cmd="selectorai.py status --who"))
@@ -94,13 +101,13 @@ def run_plain_picker(provider_list, statuses, service_states, reattach=None):
 
     print(t("menu_available"))
     print()
-    next_i = _print_rows(online_warn, statuses, classified, menu_provider, start=1)
+    next_i = _print_rows(online_warn, statuses, classified, menu_provider, start=1, update_info=update_info)
 
     if offline:
         print()
         print(t("health_section_offline"))
         print()
-        _print_rows(offline, statuses, classified, menu_provider, start=next_i)
+        _print_rows(offline, statuses, classified, menu_provider, start=next_i, update_info=update_info)
 
     print()
     choice = (_prompt(t("menu_pick_prompt", n=len(provider_list))) or "").strip() or "1"

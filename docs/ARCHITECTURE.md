@@ -59,6 +59,7 @@ Each `sai/providers/<name>.py` module exposes:
 | `last_used_epoch()` | fn → int | newest activity timestamp from the CLI's own local files, 0 = never |
 | `launch(yolo, prompt, cont)` | fn | exec the CLI with the fixed preset flags (never returns on success) |
 | `list_models()` | fn → list[str] \| None | available models, or None when unknowable — must be safe to call (no auth side effects) |
+| `check_update()` | fn → dict \| None | `{"installed": str, "latest": str \| None, "update_available": bool \| None}`, or None when not confirmed safe to call automatically (see docs/CAPABILITIES.md — currently just Antigravity) |
 
 `status()` returns exactly:
 

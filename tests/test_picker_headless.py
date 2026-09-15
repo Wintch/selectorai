@@ -161,6 +161,39 @@ async def _test_reattach_offer():
         check("enter on the reattach row returns the _REATTACH sentinel, not a provider id", app.chosen == picker._REATTACH)
 
 
+async def _test_update_info_line():
+    from textual.widgets import Static
+
+    update_info = {
+        "claude": {"installed": "2.1.272", "latest": "2.1.272", "update_available": False},
+        "codex": {"installed": "0.154.0", "latest": "0.155.0", "update_available": True},
+        "antigravity": None,
+        "grok": None,
+    }
+    app = picker._build_app(PROVIDER_LIST, STUB_STATUSES, STUB_SERVICE_STATES, THEME_PATH, update_info=update_info)
+    async with app.run_test() as pilot:
+        detail = str(app.query_one("#detail", Static).render())
+        check("detail panel shows claude's up-to-date update line on mount", "2.1.272" in detail)
+
+        from textual.widgets import OptionList
+
+        option_list = app.query_one("#picker", OptionList)
+        await pilot.press("down")  # grok (WARNING) — grok's update_info entry is None
+        detail_grok = str(app.query_one("#detail", Static).render())
+        # Language-agnostic check (i18n text itself varies by locale): none
+        # of the other providers' version numbers should leak into grok's
+        # own panel, and grok's entry being None means no update line at
+        # all for it.
+        check(
+            "no update line for a provider whose check_update() is None (grok)",
+            "2.1.272" not in detail_grok and "0.154.0" not in detail_grok and "0.155.0" not in detail_grok,
+        )
+
+        await pilot.press("down")  # codex (first OFFLINE provider, index 3)
+        detail_codex = str(app.query_one("#detail", Static).render())
+        check("detail panel shows codex's update-available line", "0.154.0" in detail_codex and "0.155.0" in detail_codex)
+
+
 async def _test_cycle_lang():
     app = picker._build_app(PROVIDER_LIST, STUB_STATUSES, STUB_SERVICE_STATES, THEME_PATH)
     exit_results = []
@@ -206,6 +239,7 @@ def main():
 
     try:
         asyncio.run(_test_options_and_navigation())
+        asyncio.run(_test_update_info_line())
 
         # Reattach offer: pure rendering + selection, no key that touches
         # LANG_FILE/THEME_FILE — assert both are exactly as this test found

@@ -135,6 +135,23 @@ def render_status_rows(p, status):
     return lines
 
 
+def render_update_line(info):
+    """info: a provider's check_update() result — None (not supported, or
+    not confirmed safe to check automatically — see
+    sai/providers/antigravity.py's check_update()) or {"installed",
+    "latest", "update_available"}. Returns one formatted line, or None
+    when there's nothing to show — same "nothing cached -> no line" shape
+    as sai.models.models_line()."""
+    if not info or not info.get("installed"):
+        return None
+    installed = info["installed"]
+    if info.get("update_available") is True and info.get("latest"):
+        return t("detail_update_available", installed=installed, latest=info["latest"])
+    if info.get("update_available") is False:
+        return t("detail_update_current", installed=installed)
+    return t("detail_update_unknown", installed=installed)
+
+
 def provider_summary(status):
     pct = status["pct_used"]
     if pct is None:

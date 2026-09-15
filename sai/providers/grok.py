@@ -17,6 +17,7 @@ appends a caveat row (see sai/providers/base.py's render_status_rows,
 p == "grok" branch) when real numbers come back, not just on a failed
 probe, since the risk is specifically in a number that looks fine.
 """
+import json
 import os
 import re
 import subprocess
@@ -218,6 +219,28 @@ def list_models():
     except Exception:
         return None
     return parse_model_lines(out)
+
+
+def check_update():
+    # `grok update --check --json` confirmed live (docs/CAPABILITIES.md)
+    # to be a clean, no-login read that already reports both versions and
+    # whether an update is available — no separate installed-version call
+    # needed, unlike Claude/Codex. Real confirmed output:
+    #   {"currentVersion":"1.0.30","latestVersion":"1.0.30",
+    #    "updateAvailable":false,"channel":"stable"}
+    # Unlike a bare `grok update`, which would actually install one.
+    try:
+        out = subprocess.run(
+            ["grok", "update", "--check", "--json"], capture_output=True, text=True, timeout=10
+        ).stdout
+        data = json.loads(out)
+    except Exception:
+        return None
+    return {
+        "installed": data.get("currentVersion"),
+        "latest": data.get("latestVersion"),
+        "update_available": data.get("updateAvailable"),
+    }
 
 
 def launch(yolo, prompt, cont):

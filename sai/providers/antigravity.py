@@ -123,6 +123,17 @@ def list_models():
     return parse_model_lines(out)
 
 
+def check_update():
+    # `agy update --help` prints a broken/minimal help with no documented
+    # flags and gives no way to confirm it's read-only rather than
+    # actually applying an update (unlike claude/codex/grok's checks, all
+    # confirmed as pure reads — see docs/CAPABILITIES.md). Not safe to
+    # call automatically until that's confirmed in a disposable
+    # environment; None means "unknown", same convention list_models()
+    # above uses for its own unverified-auth caution.
+    return None
+
+
 def launch(yolo, prompt, cont):
     args = ["agy", "--dangerously-skip-permissions"]
     if cont:

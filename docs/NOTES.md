@@ -375,6 +375,40 @@ plain fallback menu (`sai/ui/plain.py`, used with no tty or no Textual) —
 that display is read-only and never triggers a fetch; run `models` again
 to refresh it.
 
+## Update checks — automatic, unlike `models`
+
+Grounded in [`docs/CAPABILITIES.md`](CAPABILITIES.md)'s per-provider audit.
+Unlike model listings above (explicit-only, since two of four providers have
+unverified auth behavior on a bare invocation), a version/update check is
+confirmed **safe to run automatically** for three of the four providers —
+none of these three risk an auth popup or mutate anything, they're pure
+reads:
+
+| Provider | Command | Confirmed live |
+|---|---|---|
+| Claude Code | `claude doctor` — parses `Running: native (X)` and `Last update attempt: success → X (date)` | 2026-09-15, `2.1.272`, up to date |
+| Codex CLI | `~/.codex/version.json` (`{"latest_version": ..., ...}`, maintained by Codex itself) + `codex --version` for the installed side — no subprocess needed for the "latest" half at all | 2026-09-15, `0.154.0`, up to date |
+| Grok Build | `grok update --check --json` → `{"currentVersion", "latestVersion", "updateAvailable", ...}` in one call | 2026-09-15, `1.0.30`, up to date |
+| Antigravity (`agy`) | none — `agy update --help` never confirmed read-only vs. update-and-mutate, so `sai/providers/antigravity.py`'s `check_update()` returns `None` unconditionally rather than risk it | not attempted |
+
+Wired in as a third parallel probe alongside quota-status and service-status
+(`sai.cli._fetch_provider_data`, three threads instead of the earlier two —
+see "Service status" above for why parallel, not sequential, matters here
+too) and cached 6 hours (`sai.cache.UPDATE_CACHE_TTL`) — versions don't
+change often enough to need per-minute freshness, but frequently enough that
+the old models-style "only on an explicit command" gate would leave this
+stale for days. No opt-in flag needed, unlike `--check-antigravity`/
+`--check-grok`: `check_update()` itself is what decides per-provider whether
+it's safe to call at all, so Antigravity's `None` just means one less thing
+shown, never a risky call skipped by a toggle.
+
+Shown as one more `Update: ...` line — same spot as the `Models: ...` line —
+in the picker's detail panel, plain `status`, and the plain fallback menu,
+via `sai/providers/base.py`'s `render_update_line()`: "`v1.0.30 → v1.0.31
+available`" when a newer version is confirmed, "`up to date (v1.0.30)`" when
+not, or nothing at all for a provider whose `check_update()` came back
+`None`.
+
 ## State files (`~/.selectorai/`)
 
 - `launch.log` — every launch made through this script (timestamp, provider,

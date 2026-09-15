@@ -65,3 +65,11 @@ def list_models(p):
     # explicit one-shot command where a real traceback on an unexpected
     # failure is more useful than silently returning None.
     return registry[p].list_models()
+
+
+def check_update(p):
+    # Thin passthrough, same shape as status() above — sai.cache's
+    # fetch_update_info_cached is the one that wraps this defensively for
+    # its automatic background-probe use, same split as status()/
+    # fetch_all_statuses.
+    return registry[p].check_update()
