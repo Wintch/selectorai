@@ -21,6 +21,7 @@ provider's own shipped docs) or explicitly marked **unverified**/
 - [What "status" actually means, per provider](#what-status-actually-means-per-provider)
 - [Service status probes](#service-status--a-real-outage-marks-a-provider-offline-too)
 - [Model listings (`models`)](#model-listings-models--explicit-only-never-from-statusmenu)
+- [Update checks](#update-checks--automatic-unlike-models)
 - [State files](#state-files-selectorai)
 - ["Last used"](#last-used--solves-the-original-problem)
 - [Ordering — by last used, not by quota](#ordering--by-last-used-not-by-quota)

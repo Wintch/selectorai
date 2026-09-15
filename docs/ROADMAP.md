@@ -29,9 +29,11 @@ what needs more confirmation first.
 ### ~~1. Read-only update-check surfaced in `status`/the picker~~ — shipped
 
 Extended the provider contract with `check_update()` (Claude/Codex/Grok
-confirmed safe, Antigravity's returns `None` per the gap above) and wired
-it in as a third automatic parallel probe next to quota/service status.
-Full writeup, exact commands, and the caching/i18n details:
+confirmed safe; Antigravity's returns `None` since `agy update --help`
+never confirmed read-only vs. update-and-mutate behavior — see
+[`docs/CAPABILITIES.md`](CAPABILITIES.md#antigravity-agy)) and wired it in
+as a third automatic parallel probe next to quota/service status. Full
+writeup, exact commands, and the caching/i18n details:
 [`docs/NOTES.md`](NOTES.md#update-checks--automatic-unlike-models).
 
 ### 1. Session browsing beyond blind `--continue`

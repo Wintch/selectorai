@@ -146,9 +146,12 @@ config file).
   full manifest of everything a session in this directory actually
   loads. Confirmed live: it lists **26 bundled skills** of grok's own
   (`~/.grok/bundled/skills/*/SKILL.md`) **plus cross-vendor items grok
-  detects and loads via an `externalCompat` layer** — cells for vendor
-  `cursor`, `claude`, `codex`, each covering surfaces `skills/rules/
-  agents/mcps/hooks/sessions`, all `enabled: true` by default. Claude
+  detects and loads via an `externalCompat` layer** — 13 cells total:
+  `cursor` and `claude` each get full coverage across `skills/rules/
+  agents/mcps/hooks/sessions` (6 surfaces apiece, all `enabled: true` by
+  default), but `codex` gets only a single `sessions` cell (`enabled:
+  true`) — no skills/rules/agents/mcps/hooks entries for codex at all.
+  Claude
   Code's `frontend-design` plugin showed up **inside grok's own
   manifest** — `source.type: "plugin"`, `vendor: "claude"`, `enabled:
   true`, pointed at `~/.claude/plugins/marketplaces/
