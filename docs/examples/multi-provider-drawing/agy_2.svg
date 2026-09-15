@@ -1,0 +1,191 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" width="800" height="400">
+  <defs>
+    <linearGradient id="sunsetSky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff6b35"/>
+      <stop offset="35%" style="stop-color:#f7931e"/>
+      <stop offset="65%" style="stop-color:#ffcc02"/>
+      <stop offset="100%" style="stop-color:#ffe066"/>
+    </linearGradient>
+    <linearGradient id="carBody2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e8e8e8"/>
+      <stop offset="30%" style="stop-color:#c0c0c0"/>
+      <stop offset="70%" style="stop-color:#a0a0b0"/>
+      <stop offset="100%" style="stop-color:#8888a0"/>
+    </linearGradient>
+    <linearGradient id="chrome" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#fff"/>
+      <stop offset="50%" style="stop-color:#ccc"/>
+      <stop offset="100%" style="stop-color:#999"/>
+    </linearGradient>
+    <linearGradient id="glass2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff9900;stop-opacity:0.5"/>
+      <stop offset="100%" style="stop-color:#ffcc00;stop-opacity:0.3"/>
+    </linearGradient>
+    <radialGradient id="hoverGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#00ccff;stop-opacity:0.7"/>
+      <stop offset="40%" style="stop-color:#0099ff;stop-opacity:0.4"/>
+      <stop offset="100%" style="stop-color:#0066ff;stop-opacity:0"/>
+    </radialGradient>
+    <radialGradient id="sunGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#fff;stop-opacity:1"/>
+      <stop offset="40%" style="stop-color:#ffee00;stop-opacity:0.8"/>
+      <stop offset="100%" style="stop-color:#ff6600;stop-opacity:0"/>
+    </radialGradient>
+    <filter id="glow2">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="bigGlow">
+      <feGaussianBlur stdDeviation="10" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <linearGradient id="thruster" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#00ddff"/>
+      <stop offset="100%" style="stop-color:#0088ff;stop-opacity:0.2"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Sunset sky -->
+  <rect width="800" height="400" fill="url(#sunsetSky)"/>
+
+  <!-- Sun -->
+  <circle cx="650" cy="130" r="60" fill="url(#sunGrad)" filter="url(#bigGlow)"/>
+  <circle cx="650" cy="130" r="30" fill="#fff" opacity="0.9"/>
+
+  <!-- Clouds -->
+  <g opacity="0.3" fill="#fff">
+    <ellipse cx="150" cy="80" rx="60" ry="20"/>
+    <ellipse cx="190" cy="75" rx="40" ry="15"/>
+    <ellipse cx="120" cy="78" rx="35" ry="12"/>
+  </g>
+  <g opacity="0.25" fill="#fff">
+    <ellipse cx="500" cy="60" rx="50" ry="15"/>
+    <ellipse cx="530" cy="55" rx="35" ry="12"/>
+  </g>
+
+  <!-- Distant city silhouette -->
+  <rect x="0" y="310" width="800" height="90" fill="#cc5500" opacity="0.3"/>
+  <rect x="50" y="280" width="30" height="30" fill="#b34700" opacity="0.3"/>
+  <rect x="90" y="270" width="20" height="40" fill="#b34700" opacity="0.3"/>
+  <rect x="140" y="285" width="40" height="25" fill="#b34700" opacity="0.3"/>
+  <rect x="250" y="265" width="25" height="45" fill="#b34700" opacity="0.3"/>
+  <rect x="280" y="275" width="35" height="35" fill="#b34700" opacity="0.3"/>
+  <rect x="500" y="278" width="20" height="32" fill="#b34700" opacity="0.3"/>
+  <rect x="540" y="260" width="30" height="50" fill="#b34700" opacity="0.3"/>
+  <rect x="600" y="285" width="45" height="25" fill="#b34700" opacity="0.3"/>
+  <rect x="700" y="275" width="25" height="35" fill="#b34700" opacity="0.3"/>
+  <rect x="740" y="290" width="40" height="20" fill="#b34700" opacity="0.3"/>
+
+  <!-- Ground -->
+  <rect x="0" y="340" width="800" height="60" fill="#994400" opacity="0.4"/>
+
+  <!-- === RETRO-FUTURISTIC FLYING CAR === -->
+
+  <!-- Hover energy beams -->
+  <g filter="url(#bigGlow)" opacity="0.6">
+    <path d="M 260 275 L 240 340 L 280 340 Z" fill="url(#thruster)"/>
+    <path d="M 350 280 L 330 345 L 370 345 Z" fill="url(#thruster)"/>
+    <path d="M 490 280 L 470 345 L 510 345 Z" fill="url(#thruster)"/>
+    <path d="M 570 275 L 550 340 L 590 340 Z" fill="url(#thruster)"/>
+  </g>
+
+  <!-- Hover glow on ground -->
+  <ellipse cx="400" cy="345" rx="180" ry="20" fill="url(#hoverGlow)" filter="url(#bigGlow)"/>
+
+  <!-- Car shadow on ground -->
+  <ellipse cx="400" cy="350" rx="160" ry="8" fill="#000" opacity="0.15"/>
+
+  <!-- Main body - rounded retro shape -->
+  <path d="M 180 240 
+           Q 180 200 230 190 
+           L 300 175 
+           Q 330 168 370 168 
+           L 450 168 
+           Q 490 168 520 178 
+           L 590 200 
+           Q 640 215 640 240 
+           L 640 260 
+           Q 640 278 620 280 
+           L 200 280 
+           Q 180 278 180 260 Z" 
+        fill="url(#carBody2)" stroke="#888" stroke-width="1.5"/>
+
+  <!-- Chrome trim line -->
+  <path d="M 200 250 Q 300 242 400 243 Q 500 244 620 252" 
+        fill="none" stroke="url(#chrome)" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Bubble canopy (retro dome windshield) -->
+  <path d="M 300 178 
+           Q 295 145 330 130 
+           L 380 120 
+           Q 410 115 440 120 
+           L 490 135 
+           Q 520 148 515 178 Z" 
+        fill="url(#glass2)" stroke="#ffaa00" stroke-width="1.5" opacity="0.8"/>
+
+  <!-- Canopy reflection -->
+  <path d="M 340 165 Q 355 140 390 132 L 385 135 Q 360 145 348 165 Z" 
+        fill="#fff" opacity="0.3"/>
+
+  <!-- Driver silhouette inside -->
+  <circle cx="400" cy="158" r="12" fill="#553300" opacity="0.3"/>
+  <rect x="393" y="168" width="14" height="10" rx="3" fill="#553300" opacity="0.2"/>
+
+  <!-- Front fin -->
+  <path d="M 180 235 L 160 225 L 165 215 L 195 225 Z" 
+        fill="#b0b0c0" stroke="#999" stroke-width="1"/>
+
+  <!-- Rear fin (retro tail fin!) -->
+  <path d="M 610 220 L 660 180 L 665 185 L 640 220 Z" 
+        fill="#b0b0c0" stroke="#999" stroke-width="1"/>
+  <path d="M 625 210 L 670 170 L 672 175 L 630 212 Z" 
+        fill="#a0a0b0" stroke="#888" stroke-width="0.5"/>
+
+  <!-- Rear fin light -->
+  <circle cx="660" cy="183" r="4" fill="#ff3300" filter="url(#glow2)"/>
+
+  <!-- Headlights -->
+  <ellipse cx="190" cy="245" rx="12" ry="8" fill="#ffee88" filter="url(#glow2)"/>
+  <ellipse cx="190" cy="245" rx="6" ry="4" fill="#fff"/>
+
+  <!-- Headlight beam -->
+  <path d="M 178 245 L 100 230 L 100 260 Z" fill="#ffee88" opacity="0.1"/>
+
+  <!-- Tail lights -->
+  <ellipse cx="632" cy="248" rx="8" ry="10" fill="#ff4400" filter="url(#glow2)"/>
+  <ellipse cx="632" cy="248" rx="4" ry="5" fill="#ff6600"/>
+
+  <!-- Side hover pod - front -->
+  <ellipse cx="260" cy="278" rx="25" ry="8" fill="#999" stroke="#777" stroke-width="1"/>
+  <ellipse cx="260" cy="278" rx="12" ry="4" fill="#00ccff" filter="url(#glow2)" opacity="0.8"/>
+
+  <!-- Side hover pod - rear -->
+  <ellipse cx="560" cy="278" rx="25" ry="8" fill="#999" stroke="#777" stroke-width="1"/>
+  <ellipse cx="560" cy="278" rx="12" ry="4" fill="#00ccff" filter="url(#glow2)" opacity="0.8"/>
+
+  <!-- Exhaust trail -->
+  <g filter="url(#glow2)" opacity="0.5">
+    <circle cx="670" cy="248" r="5" fill="#ff6600" opacity="0.6"/>
+    <circle cx="690" cy="250" r="7" fill="#ff8800" opacity="0.4"/>
+    <circle cx="715" cy="252" r="9" fill="#ffaa00" opacity="0.25"/>
+    <circle cx="745" cy="253" r="11" fill="#ffcc00" opacity="0.15"/>
+  </g>
+
+  <!-- Motion streaks -->
+  <line x1="80" y1="220" x2="140" y2="220" stroke="#fff" stroke-width="1.5" opacity="0.3"/>
+  <line x1="60" y1="240" x2="135" y2="240" stroke="#fff" stroke-width="2" opacity="0.35"/>
+  <line x1="90" y1="260" x2="150" y2="260" stroke="#fff" stroke-width="1" opacity="0.25"/>
+
+  <!-- Decorative antenna -->
+  <line x1="410" y1="120" x2="415" y2="98" stroke="#aaa" stroke-width="1.5"/>
+  <circle cx="415" cy="96" r="3" fill="#ff0000" filter="url(#glow2)"/>
+
+  <!-- Title -->
+  <text x="400" y="385" font-family="Georgia, serif" font-size="16" fill="#553300" text-anchor="middle" opacity="0.7" font-style="italic">AERO CLASSIC 2077 — AGY MOTORS</text>
+</svg>

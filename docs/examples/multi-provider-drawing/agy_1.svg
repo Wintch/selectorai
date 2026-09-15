@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" width="800" height="400">
+  <defs>
+    <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0b0033"/>
+      <stop offset="60%" style="stop-color:#1a0a4e"/>
+      <stop offset="100%" style="stop-color:#2d1b69"/>
+    </linearGradient>
+    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff0055"/>
+      <stop offset="50%" style="stop-color:#cc0044"/>
+      <stop offset="100%" style="stop-color:#990033"/>
+    </linearGradient>
+    <linearGradient id="windowGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#00e5ff;stop-opacity:0.9"/>
+      <stop offset="100%" style="stop-color:#0066ff;stop-opacity:0.7"/>
+    </linearGradient>
+    <radialGradient id="wheelGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#444"/>
+      <stop offset="60%" style="stop-color:#222"/>
+      <stop offset="100%" style="stop-color:#111"/>
+    </radialGradient>
+    <radialGradient id="neonGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#00ffff;stop-opacity:0.8"/>
+      <stop offset="100%" style="stop-color:#00ffff;stop-opacity:0"/>
+    </radialGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background - Cyberpunk night -->
+  <rect width="800" height="400" fill="url(#skyGrad)"/>
+  <!-- Stars -->
+  <circle cx="100" cy="40" r="1.5" fill="#fff" opacity="0.8"/>
+  <circle cx="250" cy="70" r="1" fill="#fff" opacity="0.6"/>
+  <circle cx="400" cy="30" r="1.8" fill="#fff" opacity="0.9"/>
+  <circle cx="550" cy="55" r="1.2" fill="#fff" opacity="0.7"/>
+  <circle cx="700" cy="45" r="1.5" fill="#fff" opacity="0.8"/>
+  <circle cx="150" cy="90" r="0.8" fill="#fff" opacity="0.5"/>
+  <circle cx="650" cy="80" r="1" fill="#fff" opacity="0.6"/>
+
+  <!-- Ground / road -->
+  <rect x="0" y="310" width="800" height="90" fill="#1a1a2e"/>
+  <line x1="0" y1="312" x2="800" y2="312" stroke="#00ffff" stroke-width="1" opacity="0.3"/>
+  <!-- Road markings -->
+  <rect x="50" y="345" width="60" height="4" rx="2" fill="#555" opacity="0.6"/>
+  <rect x="180" y="345" width="60" height="4" rx="2" fill="#555" opacity="0.6"/>
+  <rect x="310" y="345" width="60" height="4" rx="2" fill="#555" opacity="0.6"/>
+  <rect x="440" y="345" width="60" height="4" rx="2" fill="#555" opacity="0.6"/>
+  <rect x="570" y="345" width="60" height="4" rx="2" fill="#555" opacity="0.6"/>
+  <rect x="700" y="345" width="60" height="4" rx="2" fill="#555" opacity="0.6"/>
+
+  <!-- === FUTURISTIC CYBER SPORTS CAR === -->
+
+  <!-- Neon underglow -->
+  <ellipse cx="400" cy="310" rx="200" ry="15" fill="url(#neonGlow)" filter="url(#softGlow)"/>
+
+  <!-- Car body - sleek low profile -->
+  <path d="M 150 280 
+           Q 160 230 250 210 
+           L 340 195 
+           Q 380 185 420 190 
+           L 520 210 
+           Q 600 230 640 260 
+           L 650 280 
+           Q 650 305 640 308 
+           L 160 308 
+           Q 150 305 150 280 Z" 
+        fill="url(#bodyGrad)" stroke="#ff3377" stroke-width="1"/>
+
+  <!-- Side panel detail line -->
+  <path d="M 180 270 Q 300 255 400 258 Q 500 261 620 275" 
+        fill="none" stroke="#ff6699" stroke-width="1.5" opacity="0.6"/>
+
+  <!-- Windshield -->
+  <path d="M 340 198 L 310 225 Q 305 230 310 235 L 330 260 L 420 260 L 430 235 Q 435 225 425 215 L 420 193 Z" 
+        fill="url(#windowGrad)" stroke="#00e5ff" stroke-width="1.5" opacity="0.85"/>
+
+  <!-- Rear window -->
+  <path d="M 440 200 L 445 250 L 510 258 L 515 215 Z" 
+        fill="url(#windowGrad)" stroke="#00e5ff" stroke-width="1" opacity="0.6"/>
+
+  <!-- Headlight -->
+  <path d="M 155 265 L 170 255 L 185 265 L 185 280 L 155 280 Z" 
+        fill="#00ffff" filter="url(#glow)"/>
+  <rect x="155" y="270" width="30" height="3" fill="#ffffff" opacity="0.9"/>
+
+  <!-- Tail light -->
+  <path d="M 635 260 L 645 265 L 645 290 L 625 295 L 625 270 Z" 
+        fill="#ff0044" filter="url(#glow)"/>
+
+  <!-- Spoiler -->
+  <path d="M 610 225 L 660 210 L 665 215 L 615 230 Z" 
+        fill="#cc0044" stroke="#ff0055" stroke-width="0.5"/>
+  <line x1="630" y1="230" x2="650" y2="218" stroke="#990033" stroke-width="3"/>
+
+  <!-- Front wheel -->
+  <g transform="translate(235, 295)">
+    <circle r="28" fill="url(#wheelGrad)" stroke="#333" stroke-width="2"/>
+    <circle r="20" fill="none" stroke="#444" stroke-width="3"/>
+    <circle r="8" fill="#00ffff" filter="url(#glow)" opacity="0.7"/>
+    <circle r="4" fill="#00ffff"/>
+    <!-- Spokes -->
+    <line x1="0" y1="-20" x2="0" y2="-8" stroke="#00ccff" stroke-width="2" opacity="0.6"/>
+    <line x1="19" y1="-6" x2="7.6" y2="-2.5" stroke="#00ccff" stroke-width="2" opacity="0.6"/>
+    <line x1="11.8" y1="16.2" x2="4.7" y2="6.5" stroke="#00ccff" stroke-width="2" opacity="0.6"/>
+    <line x1="-11.8" y1="16.2" x2="-4.7" y2="6.5" stroke="#00ccff" stroke-width="2" opacity="0.6"/>
+    <line x1="-19" y1="-6" x2="-7.6" y2="-2.5" stroke="#00ccff" stroke-width="2" opacity="0.6"/>
+    <!-- Tire glow -->
+    <circle r="28" fill="none" stroke="#00ffff" stroke-width="1" opacity="0.4" filter="url(#glow)"/>
+  </g>
+
+  <!-- Rear wheel -->
+  <g transform="translate(555, 295)">
+    <circle r="28" fill="url(#wheelGrad)" stroke="#333" stroke-width="2"/>
+    <circle r="20" fill="none" stroke="#444" stroke-width="3"/>
+    <circle r="8" fill="#00ffff" filter="url(#glow)" opacity="0.7"/>
+    <circle r="4" fill="#00ffff"/>
+    <!-- Spokes -->
+    <line x1="0" y1="-20" x2="0" y2="-8" stroke="#00ccff" stroke-width="2" opacity="0.6"/>
+    <line x1="19" y1="-6" x2="7.6" y2="-2.5" stroke="#00ccff" stroke-width="2" opacity="0.6"/>
+    <line x1="11.8" y1="16.2" x2="4.7" y2="6.5" stroke="#00ccff" stroke-width="2" opacity="0.6"/>
+    <line x1="-11.8" y1="16.2" x2="-4.7" y2="6.5" stroke="#00ccff" stroke-width="2" opacity="0.6"/>
+    <line x1="-19" y1="-6" x2="-7.6" y2="-2.5" stroke="#00ccff" stroke-width="2" opacity="0.6"/>
+    <!-- Tire glow -->
+    <circle r="28" fill="none" stroke="#00ffff" stroke-width="1" opacity="0.4" filter="url(#glow)"/>
+  </g>
+
+  <!-- Speed lines -->
+  <line x1="80" y1="250" x2="130" y2="250" stroke="#00ffff" stroke-width="1" opacity="0.3"/>
+  <line x1="60" y1="265" x2="120" y2="265" stroke="#00ffff" stroke-width="1.5" opacity="0.4"/>
+  <line x1="90" y1="280" x2="140" y2="280" stroke="#00ffff" stroke-width="1" opacity="0.25"/>
+
+  <!-- Title -->
+  <text x="400" y="380" font-family="monospace" font-size="16" fill="#00ffff" text-anchor="middle" filter="url(#glow)" opacity="0.8">CYBER RACER X1 — AGY MOTORS</text>
+</svg>
