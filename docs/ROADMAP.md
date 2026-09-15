@@ -2,18 +2,79 @@
 
 Not a promise, not a backlog with dates — a ranked list of what's next and
 why, grounded in the research already done in
-[`docs/CANDIDATES.md`](CANDIDATES.md) (free-tier CLI survey, August 2026)
-and [`docs/PRIOR_ART.md`](PRIOR_ART.md) (adjacent-project survey, same
-month). Read either of those for the full sourcing and confidence markers
-(`verified-docs` > `multiple-sources` > `single-source`) behind every claim
-below — this file only summarizes the ranking and the reasoning.
+[`docs/CANDIDATES.md`](CANDIDATES.md) (free-tier CLI survey, August 2026),
+[`docs/PRIOR_ART.md`](PRIOR_ART.md) (adjacent-project survey, same month),
+and [`docs/CAPABILITIES.md`](CAPABILITIES.md) (plugins/skills/MCP/update/
+session audit of the four already-tracked CLIs, September 2026). Read any
+of those for the full sourcing and confidence markers (`verified-docs` >
+`multiple-sources` > `single-source`, or verified/unverified for
+`CAPABILITIES.md`) behind every claim below — this file only summarizes the
+ranking and the reasoning.
 
 Order reflects the project's actual stance: get selectorai's own four
 providers and core mechanics solid first (see
 [`docs/NOTES.md`](NOTES.md)'s known limitations and open items), then
-expand outward — new cloud providers before local-model support, and
-ideas borrowed from prior art last, since they extend the tool rather than
+expand outward — deepening the four existing providers before new cloud
+providers, new cloud providers before local-model support, and ideas
+borrowed from prior art last, since they extend the tool rather than
 complete it.
+
+## Deepening the four existing providers
+
+Grounded in [`docs/CAPABILITIES.md`](CAPABILITIES.md)'s per-provider audit
+of plugins, skills, MCP servers, subagents, update checks, and session
+listing — ranked by what's actually confirmed safe to build on today vs.
+what needs more confirmation first.
+
+### 1. Read-only update-check surfaced in `status`/the picker
+
+Three of four already have a confirmed local, no-mutate way to compare
+installed vs. latest version: Claude (`claude doctor`), Codex (`~/.codex/
+version.json`, no command even needed), Grok (`grok update --check
+--json`). Antigravity is the one gap — `agy update --help` doesn't confirm
+read-only behavior, so it'd need the same opt-in-gate treatment
+`--check-antigravity` already gets for its OAuth-popup risk, or stay
+excluded until confirmed in a disposable environment. Extends the provider
+contract with one new optional function (`check_update()`, `None` when
+unverified/unsafe — same shape `list_models()` already uses), lowest
+implementation risk of anything in this section since three of four need
+no gating at all.
+
+### 2. Session browsing beyond blind `--continue`
+
+Grok's `grok sessions list` is confirmed to return real history with
+summaries — a genuine browser, not just "resume most recent." Codex's bare
+`codex resume` (no `--last`) already opens an interactive picker. Claude
+and Antigravity currently only expose resume-by-ID/most-recent with no
+listing subcommand found. Where a listing exists, the picker could offer
+"browse sessions" as a real menu action per provider instead of the
+current binary choice (pass `-c` or don't); where it doesn't, nothing
+changes from today's behavior.
+
+### 3. Context-cost warning for always-on skills/plugins — Claude Code only, for now
+
+`claude plugin details <name>` gives a real number (confirmed:
+`frontend-design` costs ~78-80 tokens on every session whether it's used
+or not, ~2.7k more if actually invoked) and `claude plugin disable <name>`
+already exists to act on it. The other three providers don't currently
+support this cleanly: Codex and Grok don't expose a per-skill cost figure,
+and Antigravity's 5 builtin skills have no confirmed disable path at all
+(a genuine upstream gap, not something to route around in selectorai's
+code). Realistic scope for a first pass: a `selectorai plugins claude`
+(or similar) command that runs `plugin list` + `plugin details` per
+enabled plugin and prints the token cost — Claude-only, explicitly not
+promising parity across providers until the other three's gaps close
+upstream.
+
+### 4. Try Grok's own `learn` skill before building a selectorai-native equivalent
+
+Grok already ships a bundled skill (`~/.grok/bundled/skills/learn/`)
+described as retiring skills, plugins, or MCP servers that are never
+used — exactly the shape of feature under consideration for #3 above, at
+least for grok's own surface. Not yet independently verified for
+behavior/safety; worth an actual trial run before deciding whether
+selectorai needs to build anything here at all versus just pointing users
+at what already exists.
 
 ## Near-term: new provider additions
 
