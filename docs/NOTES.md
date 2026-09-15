@@ -854,10 +854,12 @@ building anything selectorai-native for the same job. Tried it live,
 
 **Pricing it first is free and instant** — `collect_sessions.py
 --estimate` (pure local file scan, no model calls) reported only 11
-"kept" real sessions on this machine (38 seen, 23 dropped as
-no-human-turns, 3 smoke tests, 2 headless) — every scope (`quick`/`14d`/
-`30d`/`all`) converged on the same 11 sessions, ~7.4M tokens, 7 agents,
-16–51 minutes, since there simply wasn't more history to slice differently.
+"kept" real sessions on this machine (39 seen, 23 dropped as
+no-human-turns, 3 smoke tests, 2 headless) — `quick`/`30d`/`all`
+converged on the same 11 sessions, ~7.4M tokens, 7 agents, 16–51 minutes,
+since there simply wasn't more history to slice differently; `14d` was
+the outlier, seeing only 2 sessions (~6.4M tokens, 6 agents, 15–50
+minutes) because the 14-day window excluded most of that history.
 
 **Launched unattended**, exactly per the skill's own documented shape for
 this case: `grok -p "/learn --mode report --since-last"` — report-only
@@ -870,11 +872,12 @@ tokens, 48.8s), producing real structured per-session notes.
 
 **Reduce phase failed — not a bug in this project, a real account-level
 rate limit.** The single round-1 reducer agent hit
-`shell.turn.subagent_rate_limit_backoff` four times (04:27:07, 04:27:24,
-04:27:49, 04:28:25 UTC — confirmed via `~/.grok/logs/unified.jsonl`),
-exhausted its retry budget (`shell.turn.subagent_rate_limit_exhausted` →
-`turn.terminal_failure` at 04:29:11), and failed after 154.8s having spent
-75,212 tokens. Grok's own workflow engine did exactly what its design
+`shell.turn.subagent_rate_limit_backoff` seven times (04:26:37, 04:26:54,
+04:26:58, 04:27:07, 04:27:24, 04:27:49, 04:28:25 UTC — confirmed via
+`~/.grok/logs/unified.jsonl`), exhausted its retry budget
+(`shell.turn.subagent_rate_limit_exhausted` → `turn.terminal_failure` at
+04:29:11), and failed after 154.8s having spent 75,212 tokens. Grok's
+own workflow engine did exactly what its design
 promises (`docs/CAPABILITIES.md`'s `learn` write-up: "verification fails
 closed") — since **every** reducer in round 1 failed (there was only one),
 the whole `learn-traces` workflow self-paused (`status: "blocked"`,
@@ -904,15 +907,19 @@ proved the map path and the self-pause safety behavior.
 synthesized report, the two mapper notes are real, structured records of
 all 11 sessions — and they independently confirm, from actual usage logs
 rather than this project's own CLI research, the same pain point
-`docs/NOTES.md`'s "What status actually means, per provider" table and
+this file's "What status actually means, per provider" table and
 `--check-grok` section already document from the other direction. **8 of
 the 11 real sessions on this machine** were the user hunting for a
 non-interactive way to see remaining Grok quota and its reset time —
-tried `/usage`, `/cost`, `/limits`, `/quota`, `/help`, and finally plain
-natural language, in that order, across five separate sessions, with no
-skill or slash command ever answering it. Independent confirmation, from
-a completely different evidence source, of exactly the gap this project's
-`--check-grok` tmux-scrape workaround exists to paper over.
+first tried plain natural language ("how can i check current usage? next
+reset?"), then worked through `/usage`, `/cost`, `/limits`, `/quota`, and
+`/help` in that order, then fell back to natural language two more times
+afterward (once more in English, once in Spanish) — natural-language
+attempts bookending the whole sequence rather than being a single final
+fallback — across eight separate sessions, with no skill or slash command
+ever answering it. Independent confirmation, from a completely different
+evidence source, of exactly the gap this project's `--check-grok`
+tmux-scrape workaround exists to paper over.
 
 ## Antigravity auth over SSH / remote console
 
