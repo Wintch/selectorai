@@ -196,8 +196,12 @@ config file).
   *other* CLIs' sessions from inside grok) and a skill called `learn`,
   described in its own `SKILL.md` as retiring skills, plugins, or MCP
   servers that are never used. Both are exactly the shape of feature
-  this project's roadmap is now considering — flagged here as prior art
-  to look at, not yet independently verified for behavior/safety.
+  this project's roadmap is now considering. `learn` got a real trial run
+  (2026-09-15) — its map phase completed cleanly, but the reduce phase
+  hit the account's own rate limit and the workflow self-paused before
+  reaching a synthesized report; full writeup, including a real usage-log
+  finding recovered from the partial run, in
+  [`docs/NOTES.md`](NOTES.md#groks-own-learn-skill--real-trial-run-killed-by-the-accounts-own-rate-limit).
 
 ## Cross-cutting findings
 
@@ -205,8 +209,13 @@ config file).
    as grok's own built-in behavior rather than anything selectorai needs
    to build: a clean version-check (`grok update --check --json`) and a
    skill literally aimed at retiring unused skills/plugins/MCP servers
-   (`learn`). Worth actually trying `learn` before designing a
-   selectorai-side equivalent from scratch.
+   (`learn`). A real trial of `learn` got killed by the account's own
+   rate limit mid-run (see the NOTES.md link above) before reaching a
+   synthesized report — the map phase itself worked and independently
+   confirmed a real, separate finding (8 of 11 real sessions on this
+   machine were the user hunting for a non-interactive Grok quota check),
+   but the retire-unused-skills verdict `learn` itself would have reached
+   is still unknown pending a retry.
 2. **The "always-on context cost" problem isn't confined to Claude
    Code** — Grok's cross-vendor compat layer means Claude's enabled
    plugins get pulled into Grok's context too, in the same repo. The one
@@ -250,6 +259,8 @@ config file).
   cross-provider version of this feature would currently be "Claude-code
   accurate, best-effort elsewhere."
 - Before designing a selectorai-native "retire unused skill" feature,
-  worth trying Grok's own bundled `learn` skill first — it may already
-  do this well enough that selectorai's job is just surfacing it, not
-  reimplementing it.
+  worth *finishing* a trial of Grok's own bundled `learn` skill — the
+  first attempt only got through the map phase before a rate limit
+  killed the reduce step (see the NOTES.md link above); it may still do
+  this well enough that selectorai's job is just surfacing it, not
+  reimplementing it, but that isn't confirmed yet either way.

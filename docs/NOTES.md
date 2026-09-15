@@ -34,6 +34,7 @@ provider's own shipped docs) or explicitly marked **unverified**/
 - [Install methods](#install-methods-all-verified-no-sudo-required)
 - [Antigravity's OAuth-popup incident (`--check-antigravity`)](#antigravitys-live-usage-check-is-opt-in---check-antigravity)
 - [Grok's `--check-grok` — tmux-driven TUI scrape](#groks---check-grok--live-but-via-a-tmux-driven-tui-scrape-not-a-flag)
+- [Grok's own `/learn` skill — real trial, hit a rate limit](#groks-own-learn-skill--real-trial-run-killed-by-the-accounts-own-rate-limit)
 - [Antigravity auth over SSH / Error 400](#antigravity-auth-over-ssh--remote-console)
 - [Known limitations](#known-limitations)
 - [Next / open items](#next--open-items)
@@ -842,6 +843,76 @@ Doesn't affect this script either way: `launch()` never passes
 `-m/--model` for Grok, same as it doesn't pin a model for Claude, Codex, or
 Antigravity — whichever model the account actually has access to is just
 whatever `grok` defaults to on its own.
+
+## Grok's own `/learn` skill — real trial run, killed by the account's own rate limit
+
+[`docs/CAPABILITIES.md`](CAPABILITIES.md) flagged grok's bundled `learn`
+skill (retires skills/plugins/MCP servers the user never uses — see
+`~/.grok/bundled/skills/learn/SKILL.md`) as worth an actual trial before
+building anything selectorai-native for the same job. Tried it live,
+2026-09-15, same free grok.com account as everywhere else in this file.
+
+**Pricing it first is free and instant** — `collect_sessions.py
+--estimate` (pure local file scan, no model calls) reported only 11
+"kept" real sessions on this machine (38 seen, 23 dropped as
+no-human-turns, 3 smoke tests, 2 headless) — every scope (`quick`/`14d`/
+`30d`/`all`) converged on the same 11 sessions, ~7.4M tokens, 7 agents,
+16–51 minutes, since there simply wasn't more history to slice differently.
+
+**Launched unattended**, exactly per the skill's own documented shape for
+this case: `grok -p "/learn --mode report --since-last"` — report-only
+(never applies changes), no question asked (first-ever run, so
+`--since-last` scans everything, matching the priced `all` scope).
+
+**Map phase completed cleanly**: 2 mapper agents (`map:0000-0009` — 10
+sessions, 246,609 tokens, 236.7s; `map:0010-0010` — 1 session, 94,718
+tokens, 48.8s), producing real structured per-session notes.
+
+**Reduce phase failed — not a bug in this project, a real account-level
+rate limit.** The single round-1 reducer agent hit
+`shell.turn.subagent_rate_limit_backoff` four times (04:27:07, 04:27:24,
+04:27:49, 04:28:25 UTC — confirmed via `~/.grok/logs/unified.jsonl`),
+exhausted its retry budget (`shell.turn.subagent_rate_limit_exhausted` →
+`turn.terminal_failure` at 04:29:11), and failed after 154.8s having spent
+75,212 tokens. Grok's own workflow engine did exactly what its design
+promises (`docs/CAPABILITIES.md`'s `learn` write-up: "verification fails
+closed") — since **every** reducer in round 1 failed (there was only one),
+the whole `learn-traces` workflow self-paused (`status: "blocked"`,
+`pause_message: "Every reducer in round 1 failed. Check the run directory
+and relaunch."`) rather than limping forward with no synthesis. It never
+reached Verify or Report.
+
+**Killed rather than let it time out.** The top-level `grok -p` process
+was still alive and correctly blocked inside its own `state.py wait
+--timeout-min 81` call — not hung, just waiting for a workflow that had
+already permanently paused itself and was never going to produce
+`report.md` on its own. Stopped it directly (`TaskStop`) instead of
+burning another ~74 minutes waiting out a guaranteed timeout. Total real
+cost sunk before the self-pause: ~416K tokens (two successful mappers plus
+the one failed reducer) — a small fraction of the 7.4M estimate, since it
+died early rather than retrying the whole pipeline.
+
+**The verdict on `learn` itself stays open, not negative** — this is one
+rate-limited attempt on a free account already documented elsewhere in
+this file as having unpredictable limits (see "Marked experimental"
+above), not evidence the skill's own map-reduce design is unreliable in
+general. Retrying later, once whatever window this hit has reset, would
+actually test the reduce/verify/report path end to end; this run only
+proved the map path and the self-pause safety behavior.
+
+**Real value recovered anyway, from the map notes alone**: even without a
+synthesized report, the two mapper notes are real, structured records of
+all 11 sessions — and they independently confirm, from actual usage logs
+rather than this project's own CLI research, the same pain point
+`docs/NOTES.md`'s "What status actually means, per provider" table and
+`--check-grok` section already document from the other direction. **8 of
+the 11 real sessions on this machine** were the user hunting for a
+non-interactive way to see remaining Grok quota and its reset time —
+tried `/usage`, `/cost`, `/limits`, `/quota`, `/help`, and finally plain
+natural language, in that order, across five separate sessions, with no
+skill or slash command ever answering it. Independent confirmation, from
+a completely different evidence source, of exactly the gap this project's
+`--check-grok` tmux-scrape workaround exists to paper over.
 
 ## Antigravity auth over SSH / remote console
 

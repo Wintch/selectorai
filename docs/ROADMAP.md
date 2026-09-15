@@ -62,15 +62,22 @@ enabled plugin and prints the token cost — Claude-only, explicitly not
 promising parity across providers until the other three's gaps close
 upstream.
 
-### 3. Try Grok's own `learn` skill before building a selectorai-native equivalent
+### 3. Try Grok's own `learn` skill before building a selectorai-native equivalent — inconclusive, needs a retry
 
 Grok already ships a bundled skill (`~/.grok/bundled/skills/learn/`)
 described as retiring skills, plugins, or MCP servers that are never
 used — exactly the shape of feature under consideration for #2 above, at
-least for grok's own surface. Not yet independently verified for
-behavior/safety; worth an actual trial run before deciding whether
-selectorai needs to build anything here at all versus just pointing users
-at what already exists.
+least for grok's own surface. Got a real trial run (2026-09-15,
+`grok -p "/learn --mode report --since-last"`): the map phase completed
+cleanly over all 11 real sessions on this machine, but the single reduce
+agent hit the account's own rate limit, exhausted its retries, and the
+workflow self-paused before ever reaching verify/report — see
+[`docs/NOTES.md`](NOTES.md#groks-own-learn-skill--real-trial-run-killed-by-the-accounts-own-rate-limit)
+for the full timeline. Still worth a retry once the rate-limit window
+resets, since this run only proved the map path and the self-pause safety
+behavior, not whether the reduce/verify/synthesis actually works — no
+decision on building a selectorai-native equivalent should be made from
+this attempt alone.
 
 ## Near-term: new provider additions
 
