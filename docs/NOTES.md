@@ -993,11 +993,12 @@ Not yet confirmed live either way.
 
 ## Providers considered and not added (2026-09-27)
 
-Four candidates researched in one session, all **web-research only** — no
-installs, no live CLI runs on this machine. Recorded so the same ground
-isn't re-covered from scratch later; treat every claim below as sourced from
-official docs or third-party articles, not confirmed against a real prompt
-here, per [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) rule 5.
+Five candidates researched (four in one session, one added later), all
+**web-research only** — no installs, no live CLI runs on this machine.
+Recorded so the same ground isn't re-covered from scratch later; treat
+every claim below as sourced from official docs or third-party articles,
+not confirmed against a real prompt here, per
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md) rule 5.
 
 ### Perplexity — `pplx` is a search tool, not a coding CLI
 
@@ -1060,6 +1061,22 @@ Its README's "99.8% lower cost, 3.2x faster" benchmark claims are
 unsubstantiated marketing framing with no visible methodology; not treated
 as fact here. No action taken — different tool category, nothing to
 integrate.
+
+### Neural-LLM — third-party paid wrapper around existing CLIs, not a CLI itself
+
+[neural-llm.com](https://www.neural-llm.com/pricing) sells four "Power
+Agents" (Power Claude, Power Codex, Power Grok, Power Kimi), one per
+underlying CLI: local apps advertising multi-account rotation, "Token
+Saver" optimization, watchdog/recovery, and a management dashboard, layered
+on top of the CLI you already run rather than being one themselves. Same
+category mismatch as HarnessRouter above — selectorai launches real
+provider CLIs, not a wrapper that sits on top of one. Unlike every provider
+currently in the picker, it's also: paid only ($12/mo or $120/yr, one
+license per host, card-on-file "trial", no real free tier), from a company
+explicitly unaffiliated with Anthropic/OpenAI/xAI/Moonshot, and its core
+pitch — multi-account rotation to stretch quota — is the kind of thing that
+risks violating the underlying providers' terms of service. Not added, and
+not worth revisiting unless the shape of the product changes entirely.
 
 ## Known limitations
 
