@@ -36,6 +36,7 @@ provider's own shipped docs) or explicitly marked **unverified**/
 - [Grok's `--check-grok` — tmux-driven TUI scrape](#groks---check-grok--live-but-via-a-tmux-driven-tui-scrape-not-a-flag)
 - [Grok's own `/learn` skill — real trial, hit a rate limit](#groks-own-learn-skill--real-trial-run-killed-by-the-accounts-own-rate-limit)
 - [Antigravity auth over SSH / Error 400](#antigravity-auth-over-ssh--remote-console)
+- [Providers considered and not added](#providers-considered-and-not-added-2026-09-27)
 - [Known limitations](#known-limitations)
 - [Next / open items](#next--open-items)
 
@@ -990,6 +991,76 @@ on this path, `agy -p "/usage"` (behind `--check-antigravity`) likely won't
 report a meaningful `% used` the way it does for an OAuth-logged-in account.
 Not yet confirmed live either way.
 
+## Providers considered and not added (2026-09-27)
+
+Four candidates researched in one session, all **web-research only** — no
+installs, no live CLI runs on this machine. Recorded so the same ground
+isn't re-covered from scratch later; treat every claim below as sourced from
+official docs or third-party articles, not confirmed against a real prompt
+here, per [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) rule 5.
+
+### Perplexity — `pplx` is a search tool, not a coding CLI
+
+Perplexity shipped `pplx` in July 2026. Confirmed against
+[Perplexity's own CLI docs](https://docs.perplexity.ai/docs/cli/overview):
+it's a stateless search/fetch utility (`pplx search web`, `pplx content
+fetch`) that returns JSON to stdout, billed per-request via API key
+($5/1000 requests), with no interactive coding session and no
+subscription-style quota with a reset. It's explicitly meant to be called
+*by* other agents/scripts, not launched *as* one — the opposite shape from
+Claude Code/Codex/Antigravity/Grok Build. Doesn't fit this project's
+provider model at all; not a rejection of quality, just a category
+mismatch.
+
+### Chinese-model CLIs — no free-OAuth-with-reset tier survived 2026
+
+Went looking for a fifth provider with Grok Build's shape (real CLI, free
+tier, quota window that resets on its own). None currently qualify — 2026
+was the year these went from free-OAuth to paid-BYOK:
+
+- **Qwen Code** — free OAuth tier (1000 req/day) was cut to 100/day, then
+  killed outright on 2026-04-15. BYO API key only now.
+- **GLM Coding Plan (Zhipu/Z.ai)** — the Claude-Code-compatible tier is a
+  paid subscription ($10–80/mo); only the small GLM-4.5/4.7-Flash models
+  are free, and only via raw API, not through a coding-CLI quota UX.
+- **Kimi Code (Moonshot AI)** — closest in *shape*: open-source CLI, MIT
+  license, genuinely free to install, and has a real quota window (5h,
+  300–1200 calls) the way Claude/Grok do. But that quota sits behind a paid
+  membership or API key — there's no free-to-use account tier behind it,
+  just a free client.
+
+None added. If this gets re-checked later, Kimi Code is the one worth
+retesting first, since the CLI mechanics (open-source, quota window) are
+already the right shape — only the "free account" part is missing today.
+
+### Ollama — not a coding CLI by itself, needs a harness on top
+
+Ollama is a local model server (OpenAI-compatible API on
+`localhost:11434`), not an agentic coding CLI/TUI — it has no "coding
+session" concept of its own. To fit this project's launch model it would
+need a harness on top, e.g. **OpenCode**, pointed at the local Ollama
+endpoint. Conceptually it's the one candidate that doesn't map onto this
+project's quota/service-status machinery at all: no auth flow, no quota, no
+reset, no outage to probe (it's local) — it would be a permanently-"online"
+fallback of last resort, with quality bounded by local hardware/model choice
+instead. Not implemented; flagged as the most distinct-shaped future
+candidate of the four here.
+
+### HarnessRouter — different problem, not a competitor or an integration target
+
+[github.com/HarnessRouter/harnessrouter](https://github.com/HarnessRouter/harnessrouter)
+is a self-hosted Docker gateway (console + API + runner) that routes tasks
+across harnesses (Codex, Claude Code, Hermes, DeepSeek, etc.) using the
+user's own BYOK API keys, exposed as an OpenAI-Responses-compatible API —
+built for *programmatic* multi-agent orchestration inside another product,
+not for a human picking a CLI at an SSH prompt. Its "quota tracking" means
+per-task cost/latency optimization across paid API usage, not subscription
+quota with a reset — a different problem than the one this project solves.
+Its README's "99.8% lower cost, 3.2x faster" benchmark claims are
+unsubstantiated marketing framing with no visible methodology; not treated
+as fact here. No action taken — different tool category, nothing to
+integrate.
+
 ## Known limitations
 
 - Codex and Antigravity rate-limit/usage detection is reactive, not
@@ -1001,8 +1072,8 @@ Not yet confirmed live either way.
   just the first time. Nothing to fix on our end; the 10s timeout keeps it
   from hanging when it happens.
 - `guia-ai-limites-instalacion.md` at the repo root is background material
-  from an earlier chat summary (Russian, various unverified specifics —
-  promo percentages, a referral link, "Grok Build" details). Nothing in it
+  from an earlier chat summary (translated to English, covering historical
+  promo percentages, referral links, and "Grok Build" details). Nothing in it
   was taken as ground truth for this script without independently checking
   it first; treat it as inspiration, not documentation. It's excluded from
   the published repo (see `.gitignore`).
