@@ -1071,12 +1071,6 @@ integrate.
   OAuth prompt on any given run even after a prior successful login, not
   just the first time. Nothing to fix on our end; the 10s timeout keeps it
   from hanging when it happens.
-- `guia-ai-limites-instalacion.md` at the repo root is background material
-  from an earlier chat summary (translated to English, covering historical
-  promo percentages, referral links, and "Grok Build" details). Nothing in it
-  was taken as ground truth for this script without independently checking
-  it first; treat it as inspiration, not documentation. It's excluded from
-  the published repo (see `.gitignore`).
 
 ## Next / open items
 
